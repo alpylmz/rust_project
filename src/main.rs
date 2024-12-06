@@ -82,18 +82,6 @@ fn main() {
             &format!("rotation_matrix_{}", i),
         );
 
-        // if i == 0, use
-        //    [r_m(0,0), r_m(0,1), 0],
-        //    [r_m(1,0), r_m(1,1), 0],
-        //    [0, 0, 1]
-        // else if i == 1 or 4, use
-        //    [r_m(0,0), r_m(0,1), 0],
-        //    [0, 0, 1],
-        //    [-r_m(1,0), -r_m(1,1), 0]
-        // else if i == 2 or 3 or 5, use
-        //    [r_m(0,0), r_m(0,1), 0],
-        //    [0, 0, -1],
-        //    [r_m(1,0), r_m(1,1), 0]
         let limi_rotation = if i == 0 {
             rotation_matrix
         } else if i == 1 || i == 4 {
@@ -116,7 +104,6 @@ fn main() {
             )
         };
 
-        let limi_translation_name = format!("limi_translation_{}", i);
         let limi_translation = limi_translations[i].clone();
 
         if i == 0 {
