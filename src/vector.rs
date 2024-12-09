@@ -3,9 +3,7 @@ use std::ops::{Add, Sub};
 
 #[derive(Debug, Clone)]
 pub struct Vector {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+    pub data: Vec<f64>,
     pub name: String,        // Name of the vector
     pub expression: String,  // Expression representing the operation
 }
@@ -13,21 +11,54 @@ pub struct Vector {
 
 impl Vector {
     // Constructor for Vector
-    pub fn new(x: f64, y: f64, z: f64, name: &str) -> Self {
+    pub fn new(data: Vec<f64>, name: &str) -> Self {
         let vector = Vector {
-            x,
-            y,
-            z,
+            data,
             name: name.to_string(),
             expression: name.to_string(), // Initial expression is the name itself
         };
 
         // Log initialization in ANALYSIS mode
         if let Mode::ANALYSIS = get_mode() {
-            println!("val {} = Vector(List({}, {}, {}))", name, x, y, z);
+            if !name.is_empty() {
+                let elements = vector.data.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ");
+                println!("val {} = Vector(List({}))", name, elements);
+            }
+            else{
+                panic!("Name cannot be empty");
+            }
         }
 
         vector
+    }
+
+    // One more constructer is needed, this will be used when the vector is input, in that case we will not print the initialization
+    pub fn new_input(data: Vec<f64>, name: &str) -> Self {
+        let vector = Vector {
+            data,
+            name: name.to_string(),
+            expression: name.to_string(), // Initial expression is the name itself
+        };
+
+        vector
+    }
+
+    // this constructor will assign a temporary name to the vector
+    pub fn new_tempname(data: Vec<f64>) -> Self{
+        let vector = Vector {
+            data,
+            name: Vector::temp_name(),
+            expression: Vector::temp_name(),
+        };
+
+        // Log initialization in ANALYSIS mode
+        if let Mode::ANALYSIS = get_mode() {
+            let elements = vector.data.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ");
+            println!("val {} = Vector({})", vector.name, elements);
+        }
+
+        vector
+
     }
 
     // Assign a new name to the vector and log the operation
@@ -55,32 +86,20 @@ impl Vector {
     }
 
     // Helper to create a new vector with an updated expression
-    fn create_result(x: f64, y: f64, z: f64, left: &Vector, op: &str, right: &Vector) -> Vector {
-        let temp_name = Vector::temp_name();
+    fn create_result(data: Vec<f64>, name: &str, expression: &str) -> Vector {
+        let vector = Vector {
+            data,
+            name: name.to_string(),
+            expression: expression.to_string(),
+        };
 
+        // Log the operation in ANALYSIS mode
         if let Mode::ANALYSIS = get_mode() {
-            let left_expr = if left.expression.is_empty() {
-                left.name.clone()
-            } else {
-                left.expression.clone()
-            };
-
-            let right_expr = if right.expression.is_empty() {
-                right.name.clone()
-            } else {
-                right.expression.clone()
-            };
-
-            println!("val {} = {} {} {}", temp_name, left_expr, op, right_expr);
+            let elements = vector.data.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ");
+            println!("val {} = Vector({})", name, elements);
         }
 
-        Vector {
-            x,
-            y,
-            z,
-            name: temp_name.clone(), // Clone temp_name for the name field
-            expression: temp_name,   // Use the original temp_name for the expression field
-        }
+        vector
     }
 }
 
@@ -89,11 +108,11 @@ impl<'a, 'b> Add<&'b Vector> for &'a Vector {
     type Output = Vector;
 
     fn add(self, other: &'b Vector) -> Vector {
-        let x = self.x + other.x;
-        let y = self.y + other.y;
-        let z = self.z + other.z;
+        // Perform element-wise addition
+        // iterate over all data
+        let data = self.data.iter().zip(other.data.iter()).map(|(a, b)| a + b).collect::<Vec<_>>();
 
-        Vector::create_result(x, y, z, self, "+", other)
+        Vector::new(data, "temp")
     }
 }
 
@@ -102,21 +121,28 @@ impl<'a, 'b> Sub<&'b Vector> for &'a Vector {
     type Output = Vector;
 
     fn sub(self, other: &'b Vector) -> Vector {
-        let x = self.x - other.x;
-        let y = self.y - other.y;
-        let z = self.z - other.z;
+        // Perform element-wise subtraction
+        // iterate over all data
+        let data = self.data.iter().zip(other.data.iter()).map(|(a, b)| a - b).collect::<Vec<_>>();
 
-        Vector::create_result(x, y, z, self, "-", other)
+        Vector::new(data, "temp")
     }
 }
 
-// Dot product of two vectors
+// Dot and cross product of two vectors
 impl Vector {
     pub fn dot(&self, other: &Vector, result_name: &str) -> f64 {
-        let result = self.x * other.x + self.y * other.y + self.z * other.z;
+        // if both vectors do not have the same length, or if the length is not 3, panic
+        if self.data.len() != other.data.len() {
+            panic!("Vectors must have the same length and be of length 3 to perform dot product.");
+        }
 
+        // Perform element-wise multiplication and sum the results
+        let result = self.data.iter().zip(other.data.iter()).map(|(a, b)| a * b).sum();
+
+        // Log the operation in ANALYSIS mode
         if let Mode::ANALYSIS = get_mode() {
-            println!("val {} = {}.dot({})", result_name, self.name, other.name);
+            println!("val {} = {}.x({})", result_name, self.name, other.name);
         }
 
         result
@@ -124,22 +150,21 @@ impl Vector {
 
     // Cross product of two vectors
     pub fn cross(&self, other: &Vector, result_name: &str) -> Vector {
-        let x = self.y * other.z - self.z * other.y;
-        let y = self.z * other.x - self.x * other.z;
-        let z = self.x * other.y - self.y * other.x;
+        // if both vectors do not have the same length, or if the length is not 3, panic
+        if self.data.len() != other.data.len() || self.data.len() != 3 {
+            panic!("Vectors must have the same length and be of length 3 to perform cross product.");
+        }
 
-        let expression = format!("{}.x({})", self.name, other.name);
+        // Perform cross product
+        let x = self.data[1] * other.data[2] - self.data[2] * other.data[1];
+        let y = self.data[2] * other.data[0] - self.data[0] * other.data[2];
+        let z = self.data[0] * other.data[1] - self.data[1] * other.data[0];
 
+        // Log the operation in ANALYSIS mode
         if let Mode::ANALYSIS = get_mode() {
-            println!("val {} = {}", result_name, expression);
+            println!("val {} = {}.x({})", result_name, self.name, other.name);
         }
 
-        Vector {
-            x,
-            y,
-            z,
-            name: result_name.to_string(),
-            expression,
-        }
+        Vector::new(vec![x, y, z], result_name)
     }
 }

@@ -1,10 +1,16 @@
 mod vector;
 mod config;
 mod matrix;
+mod input;
+mod scalar;
+mod helper;
 
+use input::set_funcs;
 use vector::Vector;
 use config::Mode;
 use matrix::Matrix;
+use scalar::Scalar;
+use helper::{Bounds, Input, VarType};
 
 
 
@@ -12,11 +18,11 @@ use matrix::Matrix;
 fn rand_func(x: &Vector) -> Vector {
     let temp1 = &(x + x);
     let temp2 = &(x - temp1);
-    let temp3 = (temp2 + temp2);
+    let temp3 = temp2 + temp2;
     temp3
 }
 
-
+/*
 fn main() {
     // Set the mode from the configuration file
     config::set_mode(Mode::ANALYSIS);
@@ -28,9 +34,6 @@ fn main() {
 
     // Nested Operations
     let _result = (&(&m2 + &m1) - &m3).with_name("resultm");
-
-    // Set the mode from the configuration file
-    config::set_mode(Mode::ANALYSIS);
 
     // Initialize Vectors
     let v1 = Vector::new(1.0, 2.0, 3.0, "v1");
@@ -44,32 +47,66 @@ fn main() {
     let _rresult = &(rand_func(&_result)).with_name("final_result");
     let _rrresult = &(rand_func(&_rresult)).with_name("final_result2");
 }
+*/
 
 
-/*
+
 fn main() {
     // Set the mode to ANALYSIS
     config::set_mode(Mode::ANALYSIS);
 
+    // get the function name in the runtime as an input
+    let mut func_name = "rand_func";
+    // read it
+    let args = std::env::args().collect::<Vec<String>>();
+    if args.len() > 1 {
+        func_name = &args[1];
+    }
+    else {
+        println!("No function name provided. Using default function name: {}", func_name);
+    }
+
+    let return_type = VarType::Scalar;
+
+    // set inputs with empty vectors, matrices, and scalars
+    set_funcs(func_name, return_type, vec![
+        // Set a vector
+        Input::Vector("cos_qpos", vec![
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+        ]),
+        Input::Vector("sin_qpos", vec![
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+            Bounds{lower_bound: -1.0, upper_bound: 1.0},
+        ])
+    ]);
+
     let limi_translations = vec![
-        Vector::new(0.0, 0.0, 0.333, "limi_translation_0"),
-        Vector::new(0.0, 0.0, 0.0, "limi_translation_1"),
-        Vector::new(0.0, -0.316, 0.0, "limi_translation_2"),
-        Vector::new(0.083, 0.0, 0.0, "limi_translation_3"),
-        Vector::new(-0.083, 0.384, 0.0, "limi_translation_4"),
-        Vector::new(0.0, 0.0, 0.0, "limi_translation_5"),
+        Vector::new(vec![0.0, 0.0, 0.333], "limi_translation_0"),
+        Vector::new(vec![0.0, 0.0, 0.0], "limi_translation_1"),
+        Vector::new(vec![0.0, -0.316, 0.0], "limi_translation_2"),
+        Vector::new(vec![0.083, 0.0, 0.0], "limi_translation_3"),
+        Vector::new(vec![-0.083, 0.384, 0.0], "limi_translation_4"),
+        Vector::new(vec![0.0, 0.0, 0.0], "limi_translation_5"),
     ];
 
-    // Placeholder functions for sin and cos (to simulate `cos_qpos` and `sin_qpos`)
-    let cos_qpos = |i: usize| (i as f64).cos();
-    let sin_qpos = |i: usize| (i as f64).sin();
+    // cos_qpos and sin_qpos will be vectors that hold variables
+    
 
     // Number of joints
     let num_joints = 6;
 
     // Initialize variables to track the latest rotation and translation
-    let mut oMi_rotation: Option<Matrix> = None;
-    let mut oMi_translation: Option<Vector> = None;
+    let mut omi_rotation: Option<Matrix> = None;
+    let mut omi_translation: Option<Vector> = None;
 
     // Loop over each joint
     for i in 0..num_joints {
@@ -108,19 +145,19 @@ fn main() {
 
         if i == 0 {
             // First joint: Initialize
-            oMi_rotation = Some(limi_rotation.with_name(&format!("oMi_rotation_{}", i)));
-            oMi_translation = Some(limi_translation.with_name(&format!("oMi_translation_{}", i)));
+            omi_rotation = Some(limi_rotation.with_name(&format!("omi_rotation_{}", i)));
+            omi_translation = Some(limi_translation.with_name(&format!("omi_translation_{}", i)));
         } else {
             // Subsequent joints: Update
-            oMi_rotation = Some((&oMi_rotation.unwrap() * &limi_rotation).with_name(&format!("oMi_rotation_{}", i)));
-            oMi_translation = Some(
-                (&oMi_translation.unwrap() + &(oMi_rotation.as_ref().unwrap() * &limi_translation))
-                    .with_name(&format!("oMi_translation_{}", i)),
+            omi_rotation = Some((&omi_rotation.unwrap() * &limi_rotation).with_name(&format!("omi_rotation_{}", i)));
+            omi_translation = Some(
+                (&omi_translation.unwrap() + &(omi_rotation.as_ref().unwrap() * &limi_translation))
+                    .with_name(&format!("omi_translation_{}", i)),
             );
         }
     }
 
-    // print oMi_rotation and oMi_translation
-    println!("oMi_rotation: {:?}", oMi_rotation.unwrap());
+    // print omi_rotation' and omi_translation
+    println!("omi_rotation: {:?}", omi_rotation.unwrap());
 }
-*/
+

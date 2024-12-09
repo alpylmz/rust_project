@@ -143,29 +143,30 @@ impl Matrix {
 
     // Matrix × Vector multiplication (treat Vector as a 1-column matrix)
     pub fn mul_vector(&self, vector: &Vector) -> Vector {
-        if self.data[0].len() != 3 {
-            panic!("Matrix must have 3 columns to multiply with a vector.");
+        // Validate dimensions
+        if self.data[0].len() != vector.data.len() {
+            panic!("Matrix and Vector dimensions do not align for multiplication.");
         }
 
         let result_data = self
             .data
             .iter()
-            .map(|row| row[0] * vector.x + row[1] * vector.y + row[2] * vector.z)
-            .collect::<Vec<f64>>();
+            .map(|row| {
+                row.iter()
+                    .zip(&vector.data)
+                    .map(|(a, b)| a * b)
+                    .sum()
+            })
+            .collect();
 
-        let temp_name = Matrix::temp_name();
+        let res_vector = Vector::new_tempname(result_data);
 
         if let Mode::ANALYSIS = get_mode() {
-            println!("val {} = {}.x({})", temp_name, self.name, vector.name);
+            println!("val {} = {}.x({})", res_vector.name, self.name, vector.name);
         }
 
-        Vector {
-            x: result_data[0],
-            y: result_data[1],
-            z: result_data[2],
-            name: temp_name.clone(),
-            expression: temp_name,
-        }
+        res_vector
+
     }
 }
 
