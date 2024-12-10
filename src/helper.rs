@@ -16,6 +16,7 @@ pub enum Input<'a> {
     Matrix(&'a str, Vec<Vec<Bounds>>),
 }
 
+#[derive(Debug, Clone)]
 pub enum VarType {
     Scalar,
     Vector,
