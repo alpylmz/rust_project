@@ -3,8 +3,6 @@
 // This file will be no longer needed when we move away from daisy
 //use crate::config::{get_mode, Mode, TEMP_COUNTER};
 //use std::ops::{Add, Sub, Mul};
-use crate::Vector;
-use crate::Matrix;
 
 // add the struct from helper.rs
 use crate::helper::{Input, VarType, Bounds};
