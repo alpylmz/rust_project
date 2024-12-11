@@ -1,7 +1,7 @@
 // The functions in the file should be called first, even if there is no input,
 // for the functions here will also define the function and include the libraries
 // This file will be no longer needed when we move away from daisy
-use crate::helper::{Input, VarType, Bounds};
+use crate::helper::{Input, VarType};
 
 pub fn set_funcs(
     name: &str,
