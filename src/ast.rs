@@ -1,8 +1,8 @@
 
 
 use std::fmt;
-use crate::helper::{VarType, Input, Bounds};
-use std::ops::{Add, Mul, Neg};
+use crate::helper::{VarType};
+use std::ops::{Add, Mul, Neg, Sub};
 
 
 
@@ -13,11 +13,15 @@ pub enum ASTNode {
     Vector(Vec<ASTNode>),
     Matrix(Vec<Vec<ASTNode>>),
     Add(Box<ASTNode>, Box<ASTNode>),
+    Sub(Box<ASTNode>, Box<ASTNode>),
     Mul(Box<ASTNode>, Box<ASTNode>),
+    Cross(Box<ASTNode>, Box<ASTNode>),
+    Transpose(Box<ASTNode>),
     AtVec(Box<ASTNode>, usize),
     AtMat(Box<ASTNode>, usize, usize),
     Neg(Box<ASTNode>),
 }
+
 
 impl From<f64> for ASTNode {
     fn from(value: f64) -> Self {
@@ -37,6 +41,14 @@ impl Add for ASTNode {
         ASTNode::Add(Box::new(self), Box::new(rhs))
     }
 }
+
+impl Sub for ASTNode {
+    type Output = ASTNode;
+    fn sub(self, rhs: ASTNode) -> ASTNode {
+        ASTNode::Sub(Box::new(self), Box::new(rhs))
+    }
+}
+
 impl Mul for ASTNode {
     type Output = ASTNode;
     fn mul(self, rhs: ASTNode) -> ASTNode {
@@ -82,6 +94,14 @@ impl ASTNode {
         ASTNode::AtVec(Box::new(self), i)
     }
 
+    pub fn cross(self, rhs: ASTNode) -> ASTNode {
+        ASTNode::Cross(Box::new(self), Box::new(rhs))
+    }
+
+    pub fn transpose(self) -> ASTNode {
+        ASTNode::Transpose(Box::new(self))
+    }
+
     pub fn at_mat(self, r: usize, c: usize) -> ASTNode {
         ASTNode::AtMat(Box::new(self), r, c)
     }
@@ -105,9 +125,12 @@ impl ASTNode {
                 // Adjust this logic as needed. If you need type correctness, store it explicitly.
                 VarType::Matrix
             }
+            ASTNode::Sub(_, _) => VarType::Scalar,
             ASTNode::AtVec(_, _) => VarType::Scalar,
             ASTNode::AtMat(_, _, _) => VarType::Scalar,
             ASTNode::Neg(child) => child.infer_type(),
+            ASTNode::Cross(_, _) => VarType::Vector,
+            ASTNode::Transpose(_) => VarType::Matrix,
         }
     }
 
@@ -125,38 +148,7 @@ impl ASTNode {
     }
 }
 
-/*
-impl fmt::Display for ASTNode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ASTNode::Scalar(value) => write!(f, "{}", value),
-            ASTNode::Variable { name, .. } => write!(f, "{}", name),
-            ASTNode::Vector(nodes) => {
-                let elements = nodes.iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(f, "Vector(List({}))", elements)
-            }
-            ASTNode::Matrix(rows) => {
-                let row_strings: Vec<String> = rows.iter().map(|row| {
-                    let row_elems = row.iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    format!("List({})", row_elems)
-                }).collect();
-                write!(f, "Matrix(List({}))", row_strings.join(", "))
-            }
-            ASTNode::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
-            ASTNode::Mul(lhs, rhs) => write!(f, "{}.x({})", lhs, rhs),
-            ASTNode::AtVec(base, i) => write!(f, "{}.at({})", base, i),
-            ASTNode::AtMat(base, r, c) => write!(f, "{}.at({}, {})", base, r, c),
-            ASTNode::Neg(child) => write!(f, "-{}", child),
-        }
-    }
-}
-*/
+
 impl fmt::Display for ASTNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -190,10 +182,13 @@ impl fmt::Display for ASTNode {
                 write!(f, "        ))")
             }
             ASTNode::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
+            ASTNode::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
             ASTNode::Mul(lhs, rhs) => write!(f, "{}.x({})", lhs, rhs),
             ASTNode::AtVec(base, i) => write!(f, "{}.at({})", base, i),
             ASTNode::AtMat(base, r, c) => write!(f, "{}.at({}, {})", base, r, c),
             ASTNode::Neg(child) => write!(f, "-{}", child),
+            ASTNode::Cross(lhs, rhs) => write!(f, "{}.x({})", lhs, rhs),
+            ASTNode::Transpose(child) => write!(f, "{}.transpose()", child),
         }
     }
 }
