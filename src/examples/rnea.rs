@@ -17,14 +17,14 @@ fn validate_vector(node: &ASTNode, name: &str) {
 
 // I strongly disagree with this function's name, but it is actInv in pinocchio,
 // so I will leave it as is for now
-fn actInv(translation: ASTNode, rotation: ASTNode, linear: ASTNode, angular: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
-    let actInv1 = translation.cross(angular.clone()).define(format!("actInv1_{}", joint_id).as_str());
-    let actInv2 = (linear.clone() - actInv1).define(format!("actInv2_{}", joint_id).as_str());
-    let actInv3 = rotation.transpose().define(format!("actInv3_{}", joint_id).as_str());
-    let actInv4 = actInv3.clone() * actInv2.define(format!("actInv4_{}", joint_id).as_str());
-    let new_linear = (linear + actInv4).define(format!("new_linear_{}", joint_id).as_str());
-    let actInv5 = (actInv3.clone() * angular.clone()).define(format!("actInv5_{}", joint_id).as_str());
-    let new_angular = (angular + actInv5).define(format!("new_angular_{}", joint_id).as_str());
+fn act_inv(translation: ASTNode, rotation: ASTNode, linear: ASTNode, angular: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
+    let act_inv1 = translation.cross(angular.clone()).define(format!("actInv1_{}", joint_id).as_str());
+    let act_inv2 = (linear.clone() - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
+    let act_inv3 = rotation.transpose().define(format!("actInv3_{}", joint_id).as_str());
+    let act_inv4 = act_inv3.clone() * act_inv2.define(format!("actInv4_{}", joint_id).as_str());
+    let new_linear = (linear + act_inv4).define(format!("new_linear_{}", joint_id).as_str());
+    let act_inv5 = (act_inv3.clone() * angular.clone()).define(format!("actInv5_{}", joint_id).as_str());
+    let new_angular = (angular + act_inv5).define(format!("new_angular_{}", joint_id).as_str());
 
     (new_linear, new_angular)
 }
@@ -110,7 +110,7 @@ fn first_pass(
 
     // if parent > 0
     if joint_id > 1 {
-        // data.v[i] += data.liMi[i].actInv(data.v[parent])
+        // data.v[i] += data.liMi[i].act_inv(data.v[parent])
         // so in this case actInv is in motion-dense.hpp se3ActionInverse_impl
         //v.linear().noalias() = m.rotation().transpose()*(linear()-m.translation().cross(angular()));
         //v.angular().noalias() = m.rotation().transpose()*angular();
@@ -122,7 +122,7 @@ fn first_pass(
         //new_v_linear = (new_v_linear.clone() + actInv4).define(format!("new_v_linear_{}", joint_id).as_str());
         //let actInv5 = (actInv3.clone() * parent_v_angular.clone()).define(format!("actInv5_{}", joint_id).as_str());
         //new_v_angular = (new_v_angular + actInv5).define(format!("new_v_angular_{}", joint_id).as_str());
-        (new_v_linear, new_v_angular) = actInv(limi_translation, limi_rotation, parent_v_linear, parent_v_angular, joint_id);
+        (new_v_linear, new_v_angular) = act_inv(limi_translation, limi_rotation, parent_v_linear, parent_v_angular, joint_id);
     }
 
     let new_v = Vector!(
