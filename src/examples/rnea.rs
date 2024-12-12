@@ -16,25 +16,25 @@ fn validate_vector(node: &ASTNode, name: &str) {
 
 // I strongly disagree with this function's name, but it is actInv in pinocchio,
 // so I will leave it as is for now
-fn act_inv(translation: &ASTNode, rotation: &ASTNode, linear: ASTNode, angular: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
-    let act_inv1 = translation.clone().cross(angular.clone()).define(format!("actInv1_{}", joint_id).as_str());
-    let act_inv2 = (linear.clone() - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
+fn act_inv(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, angular: &ASTNode, linear_parent: ASTNode, angular_parent: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
+    let act_inv1 = translation.clone().cross(angular_parent.clone()).define(format!("actInv1_{}", joint_id).as_str());
+    let act_inv2 = (linear_parent.clone() - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
     let act_inv3 = rotation.clone().transpose().define(format!("actInv3_{}", joint_id).as_str());
-    let act_inv4 = act_inv3.clone() * act_inv2.define(format!("actInv4_{}", joint_id).as_str());
-    let new_linear = (linear + act_inv4).define(format!("new_linear_{}", joint_id).as_str());
-    let act_inv5 = (act_inv3.clone() * angular.clone()).define(format!("actInv5_{}", joint_id).as_str());
-    let new_angular = (angular + act_inv5).define(format!("new_angular_{}", joint_id).as_str());
+    let act_inv4 = (act_inv3.clone() * act_inv2).define(format!("actInv4_{}", joint_id).as_str());
+    let new_linear = (linear.clone() + act_inv4).define(format!("act_inv_linear_{}", joint_id).as_str());
+    let act_inv5 = (act_inv3.clone() * angular_parent.clone()).define(format!("actInv5_{}", joint_id).as_str());
+    let new_angular = (angular.clone() + act_inv5).define(format!("act_inv_angular_{}", joint_id).as_str());
 
     (new_linear, new_angular)
 }
-fn act_inv2(translation: &ASTNode, rotation: &ASTNode, linear: ASTNode, angular: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
-    let act_inv1 = translation.clone().cross(angular.clone()).define(format!("actInv1_2_{}", joint_id).as_str());
-    let act_inv2 = (linear.clone() - act_inv1).define(format!("actInv2_2_{}", joint_id).as_str());
+fn act_inv2(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, angular: &ASTNode, linear_parent: ASTNode, angular_parent: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
+    let act_inv1 = translation.clone().cross(angular_parent.clone()).define(format!("actInv1_2_{}", joint_id).as_str());
+    let act_inv2 = (linear_parent.clone() - act_inv1).define(format!("actInv2_2_{}", joint_id).as_str());
     let act_inv3 = rotation.clone().transpose().define(format!("actInv3_2_{}", joint_id).as_str());
-    let act_inv4 = act_inv3.clone() * act_inv2.define(format!("actInv4_2_{}", joint_id).as_str());
-    let new_linear = (linear + act_inv4).define(format!("new_linear_up2_2_{}", joint_id).as_str());
-    let act_inv5 = (act_inv3.clone() * angular.clone()).define(format!("actInv5_2_{}", joint_id).as_str());
-    let new_angular = (angular + act_inv5).define(format!("new_angular_up2_2_{}", joint_id).as_str());
+    let act_inv4 = (act_inv3.clone() * act_inv2).define(format!("actInv4_2_{}", joint_id).as_str());
+    let new_linear = (linear.clone() + act_inv4).define(format!("new_linear_up2_2_{}", joint_id).as_str());
+    let act_inv5 = (act_inv3.clone() * angular_parent.clone()).define(format!("actInv5_2_{}", joint_id).as_str());
+    let new_angular = (angular.clone() + act_inv5).define(format!("new_angular_up2_2_{}", joint_id).as_str());
 
     (new_linear, new_angular)
 }
@@ -232,15 +232,15 @@ fn first_pass(
     // I will keep it as is
 
     let mut new_v_linear = Vector!(
-        v.clone().at_vec(0),
-        v.clone().at_vec(1),
-        v.clone().at_vec(2)
+        data_v.clone().at_vec(0),
+        data_v.clone().at_vec(1),
+        data_v.clone().at_vec(2)
     ).define(format!("v_linear_{}", joint_id).as_str());
 
     let mut new_v_angular = Vector!(
-        v.clone().at_vec(3),
-        v.clone().at_vec(4),
-        v.clone().at_vec(5)
+        data_v.clone().at_vec(3),
+        data_v.clone().at_vec(4),
+        v.clone().at_vec(joint_id)
     ).define(format!("v_angular_{}", joint_id).as_str());
 
     let parent_v_linear = Vector!(
@@ -268,19 +268,10 @@ fn first_pass(
     ).define(format!("parent_a_gf_angular_{}", joint_id).as_str());
 
     // if parent > 0
-    if joint_id > 1 {
+    if joint_id > 0 {
         //data.v[i] += data.liMi[i].actInv(data.v[parent]);
-        (new_v_linear, new_v_angular) = act_inv(&limi_translation, &limi_rotation, parent_v_linear, parent_v_angular, joint_id);
+        (new_v_linear, new_v_angular) = act_inv(&limi_translation, &limi_rotation, &new_v_linear, &new_v_angular, parent_v_linear, parent_v_angular, joint_id);
     }
-
-    let new_v = Vector!(
-        new_v_linear.clone().at_vec(0),
-        new_v_linear.clone().at_vec(1),
-        new_v_linear.clone().at_vec(2),
-        new_v_angular.clone().at_vec(0),
-        new_v_angular.clone().at_vec(1),
-        new_v_angular.clone().at_vec(2)
-    ).define(format!("new_v_{}", joint_id).as_str());
 
 
     //data.a_gf[i] = jdata.c() + (data.v[i] ^ jdata.v());
@@ -305,18 +296,20 @@ fn first_pass(
 
     let new_a_gf_up1 = a.clone().at_vec(joint_id).define(format!("new_a_gf_up1_{}", joint_id).as_str());
 
-    let new_a_gf2 = Vector!(
+    let new_a_gf2_linear = Vector!(
         new_a_gf.clone().at_vec(0),
         new_a_gf.clone().at_vec(1),
-        new_a_gf.clone().at_vec(2),
+        new_a_gf.clone().at_vec(2)
+    ).define(format!("new_a_gf2_linear_{}", joint_id).as_str());
+
+    let new_a_gf2_angular = Vector!(
         new_a_gf.clone().at_vec(3),
         new_a_gf.clone().at_vec(4),
         new_a_gf_up1
-    ).define(format!("new_a_gf2_{}", joint_id).as_str());
-
+    ).define(format!("new_a_gf2_angular_{}", joint_id).as_str());
 
     // data.a_gf[i] += data.liMi[i].actInv(data.a_gf[parent]);
-    let (new_a_gf_up2_linear, new_a_gf_up2_angular) = act_inv2(&limi_translation, &limi_rotation, parent_a_gf_linear, parent_a_gf_angular, joint_id);
+    let (new_a_gf_up2_linear, new_a_gf_up2_angular) = act_inv2(&limi_translation, &limi_rotation, &new_a_gf2_linear, &new_a_gf2_angular, parent_a_gf_linear, parent_a_gf_angular, joint_id);
 
     let new_a_gf_up3 = Vector!(
         new_a_gf_up2_linear.clone().at_vec(0),
@@ -397,7 +390,14 @@ fn first_pass(
 
 
 
-
+    let new_v = Vector!(
+        new_v_linear.clone().at_vec(0),
+        new_v_linear.clone().at_vec(1),
+        new_v_linear.clone().at_vec(2),
+        new_v_angular.clone().at_vec(0),
+        new_v_angular.clone().at_vec(1),
+        new_v_angular.clone().at_vec(2)
+    ).define(format!("new_v_{}", joint_id).as_str());
 
 
 
@@ -482,8 +482,8 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
         Vector!(0.0, 0.0, 0.333).define("limi_translation_0"),
         Vector!(0.0, 0.0, 0.0).define("limi_translation_1"),
         Vector!(0.0, -0.316, 0.0).define("limi_translation_2"),
-        Vector!(0.083, 0.0, 0.0).define("limi_translation_3"),
-        Vector!(-0.083, 0.384, 0.0).define("limi_translation_4"),
+        Vector!(0.0825, 0.0, 0.0).define("limi_translation_3"),
+        Vector!(-0.0825, 0.384, 0.0).define("limi_translation_4"),
         Vector!(0.0, 0.0, 0.0).define("limi_translation_5"),
     ];
 
@@ -511,47 +511,60 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("data_v_5")
     );
 
+    // levers:
+    // levers0: xyz="0.003875 0.002081 -0.04762"/>
+    // levers1: xyz="-0.003141 -0.02872  0.003495"/>
+    // levers2: xyz="2.7518e-02 3.9252e-02 -6.6502e-02"/>
+    // levers3: xyz="-5.317e-02 1.04419e-01 2.7454e-02"/>
+    // levers4: xyz="-1.1953e-02 4.1065e-02 -3.8437e-02"/>
+    // levers5: xyz="6.0149e-02 -1.4117e-02 -1.0517e-02"/>
     let levers = vec![
         Vector!(0.003875, 0.002081, -0.04762).define("lever_0"),
-        Vector!(0.0, 0.0, 0.0).define("lever_1"),
-        Vector!(0.0, 0.0, 0.0).define("lever_2"),
-        Vector!(0.0, 0.0, 0.0).define("lever_3"),
-        Vector!(0.0, 0.0, 0.0).define("lever_4"),
-        Vector!(0.0, 0.0, 0.0).define("lever_5")
+        Vector!(-0.003141, -0.02872, 0.003495).define("lever_1"),
+        Vector!(0.027518, 0.039252, -0.066502).define("lever_2"),
+        Vector!(-0.05317, 0.104419, 0.027454).define("lever_3"),
+        Vector!(-0.011953, 0.041065, -0.038437).define("lever_4"),
+        Vector!(0.060149, -0.014117, -0.010517).define("lever_5")
     ];
 
-    let masses = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("masses");
+    let masses = Vector!(4.970684, 0.646926, 3.228604, 3.587895, 1.225946, 1.66656).define("masses");
 
+    // inertia 0: <inertia ixx="0.70337" ixy="-0.000139" ixz="0.006772" iyy="0.70661" iyz="0.019169" izz="0.009117"/>
+    // inertia 1: <inertia ixx="0.007962" ixy="-0.003925" ixz="0.010254" iyy="0.02811" iyz="0.000704" izz="0.025995"/>
+    // inertia 2: <inertia ixx="0.037242" ixy="-0.004761" ixz="-0.011396" iyy="0.036155" iyz="-0.012805" izz="0.01083"/>
+    // inertia 3: <inertia ixx="0.025853" ixy="0.007796" ixz="-0.001332" iyy="0.019552" iyz="0.008641" izz="0.028323"/>
+    // inertia 4: <inertia ixx="0.035549" ixy="-0.002117" ixz="-0.004037" iyy="0.029474" iyz="0.000229" izz="0.008627"/>
+    // inertia 5: <inertia ixx="0.001964" ixy="0.000109" ixz="-0.001158" iyy="0.004354" iyz="0.000341" izz="0.005433"/>
     let inertias = vec![
         Matrix!(
-            [0.0001, 0.0, 0.0],
-            [0.0, 0.0001, 0.0],
-            [0.0, 0.0, 0.0001]
+            [0.70337, -0.000139, 0.006772],
+            [-0.000139, 0.70661, 0.019169],
+            [0.006772, 0.019169, 0.009117]
         ).define("inertia_0"),
         Matrix!(
-            [0.0001, 0.0, 0.0],
-            [0.0, 0.0001, 0.0],
-            [0.0, 0.0, 0.0001]
+            [0.007962, -0.003925, 0.010254],
+            [-0.003925, 0.02811, 0.000704],
+            [0.010254, 0.000704, 0.025995]
         ).define("inertia_1"),
         Matrix!(
-            [0.0001, 0.0, 0.0],
-            [0.0, 0.0001, 0.0],
-            [0.0, 0.0, 0.0001]
+            [0.037242, -0.004761, -0.011396],
+            [-0.004761, 0.036155, -0.012805],
+            [-0.011396, -0.012805, 0.01083]
         ).define("inertia_2"),
         Matrix!(
-            [0.0001, 0.0, 0.0],
-            [0.0, 0.0001, 0.0],
-            [0.0, 0.0, 0.0001]
+            [0.025853, 0.007796, -0.001332],
+            [0.007796, 0.019552, 0.008641],
+            [-0.001332, 0.008641, 0.028323]
         ).define("inertia_3"),
         Matrix!(
-            [0.0001, 0.0, 0.0],
-            [0.0, 0.0001, 0.0],
-            [0.0, 0.0, 0.0001]
+            [0.035549, -0.002117, -0.004037],
+            [-0.002117, 0.029474, 0.000229],
+            [-0.004037, 0.000229, 0.008627]
         ).define("inertia_4"),
         Matrix!(
-            [0.0001, 0.0, 0.0],
-            [0.0, 0.0001, 0.0],
-            [0.0, 0.0, 0.0001]
+            [0.001964, 0.000109, -0.001158],
+            [0.000109, 0.004354, 0.000341],
+            [-0.001158, 0.000341, 0.005433]
         ).define("inertia_5")
     ];
 
@@ -572,10 +585,6 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
 
     // first pass, it takes model.joints[i], data.joints[i], model, data, q, v, a
     for i in 0..6 {
-        if i != 0 {
-            parent_v = all_v[i - 1].clone();
-            parent_a_gf = a_gf[i - 1].clone();
-        }
         if i == 0 {
             (limi_rotations, new_v, new_a_gf, new_h, new_f) = first_pass(
                 qsin.clone().at_vec(i), // qsin and qcos will not change, therefore no reference needed
