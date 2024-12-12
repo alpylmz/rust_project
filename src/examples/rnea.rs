@@ -153,10 +153,52 @@ fn rhs_mult2(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
 }
 
 
+// in C++, pinocchio/include/pinocchio/spatial/force-dense.hpp:
+// f.linear().noalias() = m.rotation()*linear();
+// f.angular().noalias() = m.rotation()*angular();
+// f.angular() += m.translation().cross(f.linear());
+fn act(
+    rotation: ASTNode, 
+    translation: ASTNode, 
+    f: ASTNode, 
+    joint_id: usize
+) -> ASTNode {
+
+    let f_linear = Vector!(
+        f.clone().at_vec(0),
+        f.clone().at_vec(1),
+        f.clone().at_vec(2)
+    ).define(format!("f_linear_{}", joint_id).as_str());
+    let f_angular = Vector!(
+        f.clone().at_vec(3),
+        f.clone().at_vec(4),
+        f.clone().at_vec(5)
+    ).define(format!("f_angular_{}", joint_id).as_str());
+
+    let new_f_linear = (rotation.clone() * f_linear.clone()).define(format!("new_f_linear_{}", joint_id).as_str());
+    let new_f_angular = (rotation.clone() * f_angular.clone()).define(format!("new_f_angular_temp_{}", joint_id).as_str());
+
+    let f_angular_cross = translation.clone().cross(new_f_linear.clone()).define(format!("f_angular_cross_{}", joint_id).as_str());
+
+    let new_f_angular = (new_f_angular.clone() + f_angular_cross.clone()).define(format!("new_f_angular_{}", joint_id).as_str());
+
+    let new_f = Vector!(
+        new_f_linear.clone().at_vec(0),
+        new_f_linear.clone().at_vec(1),
+        new_f_linear.clone().at_vec(2),
+        new_f_angular.clone().at_vec(0),
+        new_f_angular.clone().at_vec(1),
+        new_f_angular.clone().at_vec(2)
+    ).define(format!("new_f_{}", joint_id).as_str());
+
+    new_f
+}
+
+
+
+
 // I will have two functions here, one is to be called from main function for a rnea application, 
 // and the other will work as a helper function for a bigger application
-
-
 fn first_pass(
     qsin: ASTNode, 
     qcos: ASTNode, 
@@ -365,6 +407,58 @@ fn first_pass(
 }
 
 
+
+fn sec_pass(
+    mut all_f: Vec<ASTNode>,
+    limi_rotations: Vec<ASTNode>,
+    limi_translations: &Vec<ASTNode>
+) -> (Vec<ASTNode>, ASTNode) {
+    // jmodel.jointVelocitySelector(data.tau) = jdata.S().transpose()*data.f[i];
+    // I again couldn't print out info about jdata.S(), 
+    // but at least for panda it works like this:
+    // before data.tau:        0
+    //     0
+    //     0
+    //     0
+    // 0.381501
+    // 0.471101
+    // data.f[i]: 
+    //      linear = -39.5124  42.6572  22.4058
+    //      angular = 4.46655 1.28701  5.7779
+    // 
+    // after data.tau:        0
+    //     0
+    //     0
+    // 5.7779
+    // 0.381501
+    // 0.471101
+    // in each iteration, we set data.tau[joint_id] = data.f[i].angular[2];
+    // the behaviour of S() ConstraintTpl was similar in forward pass
+
+    let mut data_taus: Vec<ASTNode> = vec![];
+
+    for i in (0..6).rev() {
+        data_taus.push(all_f[i].clone().at_vec(5).define(format!("data_tau_temp_{}", i).as_str()));
+
+        //if(parent>0) data.f[parent] += data.liMi[i].act(data.f[i]);
+        if i > 1 {
+            let new_data_f_parent = act(limi_rotations[i].clone(), limi_translations[i].clone(), all_f[i].clone(), i);
+            all_f[i-1] = new_data_f_parent;
+        }
+    }
+
+    let data_tau = Vector!(
+        data_taus[5].clone(),
+        data_taus[4].clone(),
+        data_taus[3].clone(),
+        data_taus[2].clone(),
+        data_taus[1].clone(),
+        data_taus[0].clone()
+    ).define("data_tau");
+
+    (all_f, data_tau)
+}
+
 /// Both model.nq and model.nv are 6 for panda, the hand joints are excluded
 /// \param[in] q The joint configuration vector (dim model.nq).
 /// \param[in] v The joint velocity vector (dim model.nv).
@@ -482,23 +576,44 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
             parent_v = all_v[i - 1].clone();
             parent_a_gf = a_gf[i - 1].clone();
         }
-        (limi_rotations, new_v, new_a_gf, new_h, new_f) = first_pass(
-            qsin.clone().at_vec(i), // qsin and qcos will not change, therefore no reference needed
-            qcos.clone().at_vec(i),
-            &a_gf[i],
-            &data_v[i],
-            &q,
-            &v,
-            &a,
-            &parent_v, // parent_v can be empty for the first joint, it will not affect execution
-            &parent_a_gf, // parent_a_gf can be empty for the first joint, it will not affect execution
-            &limi_translations,
-            limi_rotations,
-            i,
-            &levers,
-            &masses,
-            &inertias
-        );
+        if i == 0 {
+            (limi_rotations, new_v, new_a_gf, new_h, new_f) = first_pass(
+                qsin.clone().at_vec(i), // qsin and qcos will not change, therefore no reference needed
+                qcos.clone().at_vec(i),
+                &a_gf[i],
+                &data_v[i],
+                &q,
+                &v,
+                &a,
+                &parent_v, // parent_v can be empty for the first joint, it will not affect execution
+                &parent_a_gf, // parent_a_gf can be empty for the first joint, it will not affect execution
+                &limi_translations,
+                limi_rotations,
+                i,
+                &levers,
+                &masses,
+                &inertias
+            );
+        }
+        else{
+            (limi_rotations, new_v, new_a_gf, new_h, new_f) = first_pass(
+                qsin.clone().at_vec(i), // qsin and qcos will not change, therefore no reference needed
+                qcos.clone().at_vec(i),
+                &a_gf[i],
+                &data_v[i],
+                &q,
+                &v,
+                &a,
+                &all_v[i - 1].clone(),
+                &a_gf[i - 1].clone(),
+                &limi_translations,
+                limi_rotations,
+                i,
+                &levers,
+                &masses,
+                &inertias
+            );
+        }
 
         all_v.push(new_v.clone());
         all_a_gf.push(new_a_gf.clone());
@@ -506,6 +621,9 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
         all_f.push(new_f.clone());
 
     }
+
+    // sec_pass will do its own iteration
+    let (new_f, taus) = sec_pass(all_f, limi_rotations, &limi_translations);
 
 
 
