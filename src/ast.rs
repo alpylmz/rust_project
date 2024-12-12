@@ -63,6 +63,13 @@ impl Neg for ASTNode {
 }
 
 #[macro_export]
+macro_rules! Scalar {
+    ($item:expr) => {
+        ASTNode::Scalar($item)
+    };
+}
+
+#[macro_export]
 macro_rules! Vector {
     ($($item:expr),*) => {
         {
@@ -183,7 +190,27 @@ impl fmt::Display for ASTNode {
             }
             ASTNode::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
             ASTNode::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
-            ASTNode::Mul(lhs, rhs) => write!(f, "{}.x({})", lhs, rhs),
+            ASTNode::Mul(lhs, rhs) => {
+                // if one of them is a scalar, 
+                // write!(f, "{} * ({})", lhs, rhs),
+                // otherwise, write!(f, "{}.x({})", lhs, rhs),
+                if let ASTNode::Scalar(_) = **lhs { // lhs rhs ordering is intentional, if we have 2.0 * some_vector, compile error :(
+                    write!(f, "({}) * ({})", rhs, lhs)
+                } else if let ASTNode::Scalar(_) = **rhs {
+                    write!(f, "({}) * ({})", lhs, rhs)
+                } else if let ASTNode::AtVec(_, _) = **rhs {
+                    write!(f, "({}) * ({})", lhs, rhs)
+                } else if let ASTNode::AtMat(_, _, _) = **rhs {
+                    write!(f, "({}) * ({})", lhs, rhs)
+                } else if let ASTNode::AtVec(_, _) = **lhs {
+                    write!(f, "({}) * ({})", rhs, lhs)
+                } else if let ASTNode::AtMat(_, _, _) = **lhs {
+                    write!(f, "({}) * ({})", rhs, lhs)
+                } 
+                else {
+                    write!(f, "{}.x({})", lhs, rhs)
+                }
+            }
             ASTNode::AtVec(base, i) => write!(f, "{}.at({})", base, i),
             ASTNode::AtMat(base, r, c) => write!(f, "{}.at({}, {})", base, r, c),
             ASTNode::Neg(child) => write!(f, "-{}", child),
