@@ -65,7 +65,7 @@ fn calc_limi(rotation_matrix: ASTNode, joint_id: usize) -> ASTNode {
 
 // Linear and angular are the same, there should be a better way to write it
 //vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-fn alpha_cross_linear(vin: ASTNode, s: ASTNode, joint_id: usize) -> ASTNode {
+fn alpha_cross_linear(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
     let alpha_cross1 = (-(s.clone()) * vin.clone().at_vec(1)).define(format!("alpha_cross1_linear_{}", joint_id).as_str());
     let alpha_cross2 = (s * vin.clone().at_vec(0)).define(format!("alpha_cross2_linear_{}", joint_id).as_str());
     let alpha_cross = Vector!(
@@ -78,7 +78,7 @@ fn alpha_cross_linear(vin: ASTNode, s: ASTNode, joint_id: usize) -> ASTNode {
 }
 
 //vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-fn alpha_cross_angular(vin: ASTNode, s: ASTNode, joint_id: usize) -> ASTNode {
+fn alpha_cross_angular(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
     let alpha_cross1 = (-(s.clone()) * vin.clone().at_vec(1)).define(format!("alpha_cross1_angular_{}", joint_id).as_str());
     let alpha_cross2 = (s * vin.clone().at_vec(0)).define(format!("alpha_cross2_angular_{}", joint_id).as_str());
     let alpha_cross = Vector!(
@@ -98,13 +98,13 @@ fn alpha_cross_angular(vin: ASTNode, s: ASTNode, joint_id: usize) -> ASTNode {
 fn rhs_mult(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
     let vout_0_0 = inertia.clone().at_mat(0, 0) * vin.clone().at_vec(0);
     let vout_0_1 = inertia.clone().at_mat(0, 1) * vin.clone().at_vec(1);
-    let vout_0_2 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(2);
+    let vout_0_2 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(2);
 
     let vout_1_0 = inertia.clone().at_mat(0, 1) * vin.clone().at_vec(0);
-    let vout_1_1 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(1);
+    let vout_1_1 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(1);
     let vout_1_2 = inertia.clone().at_mat(1, 2) * vin.clone().at_vec(2);
 
-    let vout_2_0 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(0);
+    let vout_2_0 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(0);
     let vout_2_1 = inertia.clone().at_mat(1, 2) * vin.clone().at_vec(1);
     let vout_2_2 = inertia.clone().at_mat(2, 2) * vin.clone().at_vec(2);
 
@@ -126,13 +126,13 @@ fn rhs_mult(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
 fn rhs_mult2(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
     let vout_0_0 = inertia.clone().at_mat(0, 0) * vin.clone().at_vec(0);
     let vout_0_1 = inertia.clone().at_mat(0, 1) * vin.clone().at_vec(1);
-    let vout_0_2 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(2);
+    let vout_0_2 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(2);
 
     let vout_1_0 = inertia.clone().at_mat(0, 1) * vin.clone().at_vec(0);
-    let vout_1_1 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(1);
+    let vout_1_1 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(1);
     let vout_1_2 = inertia.clone().at_mat(1, 2) * vin.clone().at_vec(2);
 
-    let vout_2_0 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(0);
+    let vout_2_0 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(0);
     let vout_2_1 = inertia.clone().at_mat(1, 2) * vin.clone().at_vec(1);
     let vout_2_2 = inertia.clone().at_mat(2, 2) * vin.clone().at_vec(2);
 
@@ -277,8 +277,9 @@ fn first_pass(
     //data.a_gf[i] = jdata.c() + (data.v[i] ^ jdata.v());
     // ^ operator is actually implemented in pinocchio/include/pinocchio/spatial/cartesian-axis.hpp inline void CartesianAxis<2>::alphaCross
     // vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-    let alpha_cross_linear = alpha_cross_linear(new_v_linear.clone(), v.clone().at_vec(joint_id), joint_id);
-    let alpha_cross_angular = alpha_cross_angular(new_v_angular.clone(), v.clone().at_vec(joint_id), joint_id);
+    let minus_m_w = -(v.clone().at_vec(joint_id)).define(format!("minus_m_w_{}", joint_id).as_str());
+    let alpha_cross_linear = alpha_cross_linear(minus_m_w.clone(), new_v_linear.clone(), joint_id);
+    let alpha_cross_angular = alpha_cross_angular(minus_m_w.clone(), new_v_angular.clone(), joint_id);
     
     let new_a_gf = Vector!(
         alpha_cross_linear.clone().at_vec(0),
@@ -294,7 +295,7 @@ fn first_pass(
     // I couldn't print out info about jdata.S() easily but it is ConstraintRevoluteTpl, and I believe the only thing this line does is
     // data.a_gf[i][5] = jmodel.jointVelocitySelector(a)
 
-    let new_a_gf_up1 = a.clone().at_vec(joint_id).define(format!("new_a_gf_up1_{}", joint_id).as_str());
+    let new_a_gf_up1 = (a.clone().at_vec(joint_id) + new_a_gf.clone().at_vec(5)).define(format!("new_a_gf_up1_{}", joint_id).as_str());
 
     let new_a_gf2_linear = Vector!(
         new_a_gf.clone().at_vec(0),
@@ -343,12 +344,14 @@ fn first_pass(
     let f_linear_2 = (new_a_gf_up2_linear.clone() - f_linear_1).define(format!("f_linear_2_{}", joint_id).as_str());
     let f_linear_3 = (masses.clone().at_vec(joint_id) * f_linear_2).define(format!("f_linear_3_{}", joint_id).as_str());
 
+    //////////////////
     // next line is Symmetric3::rhsMult(inertia(),a_gf.angular(),f.angular());
     let f_angular = rhs_mult2(inertias[joint_id].clone(), new_a_gf_up2_angular.clone(), joint_id).define(format!("f_angular_first_{}", joint_id).as_str());
 
     // next line is f.angular() += lever().cross(f.linear());
     let f_angular_1 = levers[joint_id].clone().cross(f_linear_3.clone()).define(format!("f_angular_1_{}", joint_id).as_str());
     let f_angular_2 = (f_angular.clone() + f_angular_1).define(format!("f_angular_2_{}", joint_id).as_str());
+    //////////////////////////
 
     // the cross here is not the regular cross product since the vectors are 6D
     // it is implemented in pinocchio/include/pinocchio/spatial/motion-dense.hpp cross_impl, 
@@ -441,8 +444,9 @@ fn sec_pass(
         data_taus.push(all_f[i].clone().at_vec(5).define(format!("data_tau_temp_{}", i).as_str()));
 
         //if(parent>0) data.f[parent] += data.liMi[i].act(data.f[i]);
-        if i > 1 {
-            let new_data_f_parent = act(limi_rotations[i].clone(), limi_translations[i].clone(), all_f[i].clone(), i);
+        if i > 0 {
+            let new_data_f_parent_add = act(limi_rotations[i].clone(), limi_translations[i].clone(), all_f[i].clone(), i);
+            let new_data_f_parent = (all_f[i-1].clone() + new_data_f_parent_add).define(format!("new_data_f_parent_{}", i).as_str());
             all_f[i-1] = new_data_f_parent;
         }
     }
@@ -493,12 +497,12 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
     // we also have a_gf, which is the vector of joint accelerations due to the gravity field
     // it is constant, so I will keep it constant here, too
     let a_gf = vec!(
-        Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("a_gf_0"),
-        Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("a_gf_1"),
-        Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("a_gf_2"),
-        Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("a_gf_3"),
-        Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("a_gf_4"),
-        Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("a_gf_5")
+        Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("a_gf_0"),
+        Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("a_gf_1"),
+        Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("a_gf_2"),
+        Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("a_gf_3"),
+        Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("a_gf_4"),
+        Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("a_gf_5")
     );
     // we also have data.v, which v[0] is set to zero explicitly, and I assume the rest should also be zero
     // I will keep it constant here, too, but keep in mind 
@@ -574,7 +578,7 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
     let mut all_f: Vec<ASTNode> = vec![];
 
     let mut parent_v = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("parent_v");
-    let mut parent_a_gf = Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("parent_a_gf");
+    let mut parent_a_gf = Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("parent_a_gf");
     let mut new_v = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("new_v");
 
     let mut new_a_gf = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("new_a_gf");
@@ -614,7 +618,7 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, q: ASTNode, v: ASTNode, a: ASTNode) {
                 &v,
                 &a,
                 &all_v[i - 1].clone(),
-                &a_gf[i - 1].clone(),
+                &all_a_gf[i - 1].clone(),
                 &limi_translations,
                 limi_rotations,
                 i,

@@ -213,7 +213,7 @@ impl fmt::Display for ASTNode {
             }
             ASTNode::AtVec(base, i) => write!(f, "{}.at({})", base, i),
             ASTNode::AtMat(base, r, c) => write!(f, "{}.at({}, {})", base, r, c),
-            ASTNode::Neg(child) => write!(f, "-{}", child),
+            ASTNode::Neg(child) => write!(f, "(-{})", child),
             ASTNode::Cross(lhs, rhs) => write!(f, "{}.x({})", lhs, rhs),
             ASTNode::Transpose(child) => write!(f, "{}.transpose()", child),
         }
