@@ -1,7 +1,7 @@
 
 
 use std::fmt;
-use crate::helper::{VarType};
+use crate::helper::{add_var_name, get_new_name, search_var_name, VarType};
 use std::ops::{Add, Mul, Neg, Sub};
 
 
@@ -143,14 +143,21 @@ impl ASTNode {
 
     /// Define this node with a given name, print the definition, and return a Variable node.
     pub fn define(self, name: &str) -> ASTNode {
+        let mut new_name = name.to_string();
+        // check if name is already defined
+        if search_var_name(name) == true {
+            new_name = get_new_name(name);
+        }
+
         // Print definition
-        println!("val {} = {}", name, self);
+        println!("val {} = {}", new_name, self);
+        add_var_name(&new_name);
 
         // Return a variable node that references this name and its inferred type
         let var_type = self.infer_type();
         ASTNode::Variable {
             var_type,
-            name: name.to_string(),
+            name: new_name.to_string(),
         }
     }
 }
