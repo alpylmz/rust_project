@@ -155,6 +155,16 @@ impl ASTNode {
     }
 }
 
+fn is_scalar(node: &ASTNode) -> bool {
+    match node {
+        ASTNode::Scalar(_) => true,
+        ASTNode::Variable { var_type, .. } => var_type == &VarType::Scalar,
+        ASTNode::AtVec(_, _) => true,
+        ASTNode::AtMat(_, _, _) => true,
+        _ => false,
+    }
+}
+
 
 impl fmt::Display for ASTNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -191,22 +201,9 @@ impl fmt::Display for ASTNode {
             ASTNode::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
             ASTNode::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
             ASTNode::Mul(lhs, rhs) => {
-                // if one of them is a scalar, 
-                // write!(f, "{} * ({})", lhs, rhs),
-                // otherwise, write!(f, "{}.x({})", lhs, rhs),
-                if let ASTNode::Scalar(_) = **lhs { // lhs rhs ordering is intentional, if we have 2.0 * some_vector, compile error :(
-                    write!(f, "({}) * ({})", rhs, lhs)
-                } else if let ASTNode::Scalar(_) = **rhs {
-                    write!(f, "({}) * ({})", lhs, rhs)
-                } else if let ASTNode::AtVec(_, _) = **rhs {
-                    write!(f, "({}) * ({})", lhs, rhs)
-                } else if let ASTNode::AtMat(_, _, _) = **rhs {
-                    write!(f, "({}) * ({})", lhs, rhs)
-                } else if let ASTNode::AtVec(_, _) = **lhs {
-                    write!(f, "({}) * ({})", rhs, lhs)
-                } else if let ASTNode::AtMat(_, _, _) = **lhs {
-                    write!(f, "({}) * ({})", rhs, lhs)
-                } 
+                if is_scalar(lhs) || is_scalar(rhs) {
+                    write!(f, "{} * ({})", lhs, rhs)
+                }
                 else {
                     write!(f, "{}.x({})", lhs, rhs)
                 }
