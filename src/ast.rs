@@ -120,19 +120,70 @@ impl ASTNode {
             ASTNode::Variable { var_type, .. } => var_type.clone(),
             ASTNode::Vector(_) => VarType::Vector,
             ASTNode::Matrix(_) => VarType::Matrix,
-            ASTNode::Add(_, _) => {
-                // In a more robust system, you'd keep track of types carefully.
-                // For now, assume additions result in the same type as their operands,
-                // or default to Scalar if unknown.
-                // This might need refinement depending on your system.
-                VarType::Scalar
-            }
-            ASTNode::Mul(_, _) => {
-                // Similarly, assume some type. For matrix multiplies often it's Matrix or Vector.
+            ASTNode::Add(child1, child2) => {
+                // Assume some type. For addition, it's often the same as the children.
                 // Adjust this logic as needed. If you need type correctness, store it explicitly.
-                VarType::Matrix
+                let child1_type = child1.infer_type();
+                let child2_type = child2.infer_type();
+                if child1_type == child2_type {
+                    child1_type
+                } else if child1_type == VarType::Vector && child2_type == VarType::Scalar {
+                    VarType::Vector
+                } else if child1_type == VarType::Matrix && child2_type == VarType::Scalar {
+                    VarType::Matrix
+                } else {
+                    println!("Addtype");
+                    println!("child1_type: {:?}", child1_type);
+                    println!("child2_type: {:?}", child2_type);
+                    println!("child1: {:?}", child1);
+                    println!("child2: {:?}", child2);
+                    panic!("Addition of different types is not allowed in this context")
+                }
             }
-            ASTNode::Sub(_, _) => VarType::Scalar,
+            ASTNode::Mul(child1, child2) => {
+                // Multiplication is the same as addition
+                let child1_type = child1.infer_type();
+                let child2_type = child2.infer_type();
+                // if we are multiplying a scalar with a vector, or a scalar with a matrix that is also valid
+                // anything else is not
+                if child1_type == child2_type {
+                    child1_type
+                } else if child1_type == VarType::Scalar && child2_type == VarType::Vector {
+                    VarType::Vector
+                } else if child1_type == VarType::Scalar && child2_type == VarType::Matrix {
+                    VarType::Matrix
+                } else if child1_type == VarType::Matrix && child2_type == VarType::Vector {
+                    VarType::Vector
+                } else {
+                    println!("Multype");
+                    println!("child1_type: {:?}", child1_type);
+                    println!("child2_type: {:?}", child2_type);
+                    println!("child1: {:?}", child1);
+                    println!("child2: {:?}", child2);
+                    panic!("Multiplication of different types is not allowed in this context")
+                }
+            }
+            ASTNode::Sub(child1, child2) => {
+                // Subtraction is the same as addition
+                let child1_type = child1.infer_type();
+                let child2_type = child2.infer_type();
+                // if we are subtracting a scalar from a vector, or a scalar from a matrix that is also valid
+                // anything else is not
+                if child1_type == child2_type {
+                    child1_type
+                } else if child1_type == VarType::Vector && child2_type == VarType::Scalar {
+                    VarType::Vector
+                } else if child1_type == VarType::Matrix && child2_type == VarType::Scalar {
+                    VarType::Matrix
+                } else {
+                    println!("Subtype");
+                    println!("child1_type: {:?}", child1_type);
+                    println!("child2_type: {:?}", child2_type);
+                    println!("child1: {:?}", child1);
+                    println!("child2: {:?}", child2);
+                    panic!("Subtraction of different types is not allowed in this context")
+                }
+            }
             ASTNode::AtVec(_, _) => VarType::Scalar,
             ASTNode::AtMat(_, _, _) => VarType::Scalar,
             ASTNode::Neg(child) => child.infer_type(),
@@ -209,7 +260,13 @@ impl fmt::Display for ASTNode {
             ASTNode::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
             ASTNode::Mul(lhs, rhs) => {
                 if is_scalar(lhs) || is_scalar(rhs) {
-                    write!(f, "{} * ({})", lhs, rhs)
+                    // if one of them is not scalar, we need to write it like non_scalar * scalar
+                    // because of Scala and Daisy...
+                    if is_scalar(lhs) {
+                        write!(f, "{} * ({})", rhs, lhs)
+                    } else {
+                        write!(f, "{} * ({})", lhs, rhs)
+                    }
                 }
                 else {
                     write!(f, "{}.x({})", lhs, rhs)
