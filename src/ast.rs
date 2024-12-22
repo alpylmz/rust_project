@@ -197,6 +197,329 @@ impl ASTNode {
         }
     }
 
+    fn unroll_opr(&self, lhs: &Box<ASTNode>, rhs: &Box<ASTNode>, new_name: &str, opr: &str) {
+        match opr {
+            "+" => {
+                if is_scalar(lhs) && is_scalar(rhs) {
+                    println!("val {} = {} + {}", new_name, lhs, rhs);
+                    add_var_name(&new_name);
+                }
+                else if is_scalar(lhs) && is_vector(rhs) {
+                    let size = get_size(&rhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {} + {}_{}", new_name, lhs, rhs, i);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_scalar(lhs) && is_matrix(rhs) {
+                    let size = get_size(&rhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {} + {}_{}_{}", new_name, lhs, rhs, i, j);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+                else if is_vector(lhs) && is_scalar(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {}_{} + {}", new_name, lhs, i, rhs);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_matrix(lhs) && is_scalar(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {}_{}_{} + {}", new_name, lhs, i, j, rhs);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+                else if is_vector(lhs) && is_vector(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {}_{} + {}_{}", new_name, lhs, i, rhs, i);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_matrix(lhs) && is_matrix(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {}_{}_{} + {}_{}_{}", new_name, lhs, i, j, rhs, i, j);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+                else {
+                    panic!("Addition of different types is not allowed in this context");
+                }
+            }
+            "-" => {
+                if is_scalar(lhs) && is_scalar(rhs) {
+                    println!("val {} = {} - {}", new_name, lhs, rhs);
+                    add_var_name(&new_name);
+                }
+                else if is_scalar(lhs) && is_vector(rhs)  {
+                    panic!("You cannot subtract a vector from a scalar");
+                }
+                else if is_scalar(lhs) && is_matrix(rhs)  {
+                    panic!("You cannot subtract a matrix from a scalar");
+                }
+                else if is_vector(lhs) && is_scalar(rhs)  {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {}_{} - {}", new_name, lhs, i, rhs);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_matrix(lhs) && is_scalar(rhs)  {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {}_{}_{} - {}", new_name, lhs, i, j, rhs);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+                else if is_vector(lhs) && is_vector(rhs)  {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {}_{} - {}_{}", new_name, lhs, i, rhs, i);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_matrix(lhs) && is_matrix(rhs)  {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {}_{}_{} - {}_{}_{}", new_name, lhs, i, j, rhs, i, j);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+            }
+            "*" => { // element-wise multiplication
+                if is_scalar(lhs) && is_scalar(rhs) {
+                    println!("val {} = {} * {}", new_name, lhs, rhs);
+                    add_var_name(&new_name);
+                }
+                else if is_scalar(lhs) && is_vector(rhs) {
+                    let size = get_size(&rhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {} * {}_{}", new_name, lhs, rhs, i);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_scalar(lhs) && is_matrix(rhs) {
+                    let size = get_size(&rhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {} * {}_{}_{}", new_name, lhs, rhs, i, j);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+                else if is_vector(lhs) && is_scalar(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {}_{} * {}", new_name, lhs, i, rhs);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_matrix(lhs) && is_scalar(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {}_{}_{} * {}", new_name, lhs, i, j, rhs);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+                else if is_vector(lhs) && is_vector(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        let new_name = format!("{}_{}", new_name, i);
+                        println!("val {} = {}_{} * {}_{}", new_name, lhs, i, rhs, i);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_matrix(lhs) && is_matrix(rhs) {
+                    let size = get_size(&lhs.to_string());
+                    for i in 0..size {
+                        for j in 0..size {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            println!("val {} = {}_{}_{} * {}_{}_{}", new_name, lhs, i, j, rhs, i, j);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+            }
+            "x" => { // cross product or matrix multiplication
+                if is_vector(lhs) && is_vector(rhs) {
+                    // implement cross product in that case
+                    let size = get_size(&lhs.to_string());
+                    let size2 = get_size(&rhs.to_string());
+                    if size != 3 || size2 != 3 {
+                        println!("lhs: {}", lhs);
+                        println!("rhs: {}", rhs);
+                        println!("size: {}", size);
+                        println!("size2: {} \n", size2);
+                        panic!("Cross product is only allowed for vectors of size 3");
+                    }
+                    let new_name = format!("{}_cross_0", new_name);
+                    // implement cross product manually
+                    // lhs_0 * rhs_1 - lhs_1 * rhs_0
+                    println!("val {} = {}_0 * {}_1 - {}_1 * {}_0", new_name, lhs, rhs, lhs, rhs);
+                    add_var_name(&new_name);
+
+                    let new_name = format!("{}_cross_1", new_name);
+                    // lhs_2 * rhs_0 - lhs_0 * rhs_2
+                    println!("val {} = {}_2 * {}_0 - {}_0 * {}_2", new_name, lhs, rhs, lhs, rhs);
+                    add_var_name(&new_name);
+
+                    let new_name = format!("{}_cross_2", new_name);
+                    // lhs_0 * rhs_1 - lhs_1 * rhs_0
+                    println!("val {} = {}_0 * {}_1 - {}_1 * {}_0", new_name, lhs, rhs, lhs, rhs);
+                    add_var_name(&new_name);
+                }
+                if is_matrix(lhs) && is_matrix(rhs) {
+                    let size1 = get_size(&lhs.to_string());
+                    let size2 = get_size(&rhs.to_string());
+                    // matrix multiplication
+                    if size1 != size2 {
+                        panic!("Matrix multiplication is only allowed for matrices of the same size");
+                    }
+                    for i in 0..size1 { // Not tested
+                        for j in 0..size1 {
+                            let new_name = format!("{}_{}_{}", new_name, i, j);
+                            let mut sum = String::new();
+                            for k in 0..size1 {
+                                sum.push_str(&format!("{} * {}_{}_{} + ", lhs, rhs, k, j));
+                            }
+                            sum.pop();
+                            sum.pop();
+                            println!("val {} = {}", new_name, sum);
+                            add_var_name(&new_name);
+                        }
+                    }
+                }
+            }
+            _ => {
+                panic!("Invalid operator");
+            }
+        }
+    }
+
+    fn unroll_print(&self, new_name: &str) {
+        match self {
+            ASTNode::Scalar(value) => {
+                println!("val {} = {}", new_name, value);
+                add_var_name(&new_name);
+            }
+            ASTNode::VariableS { name } => {
+                println!("val {} = {}", new_name, name);
+                add_var_name(&new_name);
+            }
+            ASTNode::VariableV { name } => {
+                // get the size of the vector
+                let size = get_size(name);
+                for i in 0..size {
+                    let new_name = format!("{}_{}", new_name, i);
+                    println!("val {}_{} = {}_{}", new_name, i, name, i);
+                    add_var_name(&new_name);
+                }
+            }
+            ASTNode::VariableM { name } => {
+                // get the size of the matrix
+                let size = get_size(name);
+                for i in 0..size {
+                    for j in 0..size {
+                        let new_name = format!("{}_{}_{}", new_name, i, j);
+                        println!("val {}_{}_{} = {}_{}_{}", new_name, i, j, name, i, j);
+                        add_var_name(&new_name);
+                    }
+                }
+            }
+            ASTNode::Vector(nodes) => {
+                for (i, node) in nodes.iter().enumerate() {
+                    let new_name = format!("{}_{}", new_name, i);
+                    println!("val {} = {}", new_name, node);
+                    add_var_name(&new_name);
+                }
+            }
+            ASTNode::Matrix(rows) => {
+                for (i, row) in rows.iter().enumerate() {
+                    for (j, node) in row.iter().enumerate() {
+                        let new_name = format!("{}_{}_{}", new_name, i, j);
+                        println!("val {} = {}", new_name, node);
+                        add_var_name(&new_name);
+                    }
+                }
+            }
+            ASTNode::Add(lhs, rhs) => {
+                self.unroll_opr(lhs, rhs, new_name, "+");
+            }
+            ASTNode::Sub(lhs, rhs) => {
+                self.unroll_opr(lhs, rhs, new_name, "-");
+            }
+            ASTNode::Mul(lhs, rhs) => {
+                self.unroll_opr(lhs, rhs, new_name, "*");
+            }
+            ASTNode::AtVec(base, i) => {
+                let new_name = format!("{}_{}", new_name, i);
+                println!("val {} = {}_{}", new_name, base, i);
+                add_var_name(&new_name);
+            }
+            ASTNode::AtMat(base, r, c) => {
+                let new_name = format!("{}_{}_{}", new_name, r, c);
+                println!("val {} = {}_{}_{}", new_name, base, r, c);
+                add_var_name(&new_name);
+            }
+            ASTNode::Neg(child) => {
+                let new_name = format!("{}_neg", new_name);
+                println!("val {} = -{}", new_name, child);
+                add_var_name(&new_name);
+            }
+            ASTNode::Cross(lhs, rhs) => {
+                self.unroll_opr(lhs, rhs, new_name, "x");
+            }
+            ASTNode::Transpose(child) => {
+                let new_name = format!("{}_transpose", new_name);
+                match &**child {
+                    ASTNode::VariableM {name} => {
+                        let size = get_size(name);
+                        for i in 0..size {
+                            for j in 0..size {
+                                let new_name = format!("{}_{}_{}", new_name, j, i);
+                                println!("val {} = {}_{}_{}", new_name, name, i, j);
+                                add_var_name(&new_name);
+                            }
+                        }
+                    }
+                    _ => {
+                        panic!("Transpose is only allowed for matrices");
+                    }
+                }
+            }
+        }
+    }
+
     /// Define this node with a given name, print the definition, and return a Variable node.
     pub fn define(&self, name: &str) -> ASTNode {
         let mut new_name = name.to_string();
@@ -206,9 +529,13 @@ impl ASTNode {
         }
 
         // Print definition
+        if(!UNROLL){
             println!("val {} = {}", new_name, self);
             add_var_name(&new_name);
-        
+        }
+        else{
+            self.unroll_print(&new_name);
+        }
 
         // Return a variable node that references this name and its inferred type
         let var_type = self.infer_type();
@@ -226,6 +553,22 @@ fn is_scalar(node: &ASTNode) -> bool {
         ASTNode::VariableS { .. } => true,
         ASTNode::AtVec(_, _) => true,
         ASTNode::AtMat(_, _, _) => true,
+        _ => false,
+    }
+}
+
+fn is_vector(node: &ASTNode) -> bool {
+    match node {
+        ASTNode::Vector(_) => true,
+        ASTNode::VariableV { .. } => true,
+        _ => false,
+    }
+}
+
+fn is_matrix(node: &ASTNode) -> bool {
+    match node {
+        ASTNode::Matrix(_) => true,
+        ASTNode::VariableM { .. } => true,
         _ => false,
     }
 }
