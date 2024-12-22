@@ -30,12 +30,10 @@ pub fn ex1() {
         ])
     ]);
 
-    let cos_qpos = ASTNode::Variable {
-        var_type: VarType::Vector,
+    let cos_qpos = ASTNode::VariableV {
         name: "cos_qpos".to_string(),
     };
-    let sin_qpos = ASTNode::Variable {
-        var_type: VarType::Vector,
+    let sin_qpos = ASTNode::VariableV {
         name: "sin_qpos".to_string(),
     };
 

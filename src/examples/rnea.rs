@@ -8,7 +8,7 @@ use crate::{Vector, Matrix, Scalar};
 
 fn validate_vector(node: &ASTNode, name: &str) {
     match node {
-        ASTNode::Variable { var_type, .. } if *var_type == VarType::Vector => (),
+        ASTNode::VariableV { name: _ } => (),
         ASTNode::Vector(_) => (),
         _ => panic!("{} should be a variable or a vector", name),
     }

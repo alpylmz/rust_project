@@ -3,13 +3,16 @@
 use std::fmt;
 use crate::helper::{add_var_name, get_new_name, search_var_name, VarType};
 use std::ops::{Add, Mul, Neg, Sub};
+use crate::config::UNROLL;
 
 
 
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     Scalar(f64),
-    Variable { var_type: VarType, name: String },
+    VariableS{name: String}, // Scalar
+    VariableV{name: String}, // Vector
+    VariableM{name: String}, // Matrix
     Vector(Vec<ASTNode>),
     Matrix(Vec<Vec<ASTNode>>),
     Add(Box<ASTNode>, Box<ASTNode>),
@@ -117,7 +120,9 @@ impl ASTNode {
     fn infer_type(&self) -> VarType {
         match self {
             ASTNode::Scalar(_) => VarType::Scalar,
-            ASTNode::Variable { var_type, .. } => var_type.clone(),
+            ASTNode::VariableS { .. } => VarType::Scalar,
+            ASTNode::VariableV { .. } => VarType::Vector,
+            ASTNode::VariableM { .. } => VarType::Matrix,
             ASTNode::Vector(_) => VarType::Vector,
             ASTNode::Matrix(_) => VarType::Matrix,
             ASTNode::Add(child1, child2) => {
@@ -193,7 +198,7 @@ impl ASTNode {
     }
 
     /// Define this node with a given name, print the definition, and return a Variable node.
-    pub fn define(self, name: &str) -> ASTNode {
+    pub fn define(&self, name: &str) -> ASTNode {
         let mut new_name = name.to_string();
         // check if name is already defined
         if search_var_name(name) == true {
@@ -201,14 +206,16 @@ impl ASTNode {
         }
 
         // Print definition
-        println!("val {} = {}", new_name, self);
-        add_var_name(&new_name);
+            println!("val {} = {}", new_name, self);
+            add_var_name(&new_name);
+        
 
         // Return a variable node that references this name and its inferred type
         let var_type = self.infer_type();
-        ASTNode::Variable {
-            var_type,
-            name: new_name.to_string(),
+        match var_type {
+            VarType::Scalar => ASTNode::VariableS{name: new_name},
+            VarType::Vector => ASTNode::VariableV{name: new_name},
+            VarType::Matrix => ASTNode::VariableM{name: new_name},
         }
     }
 }
@@ -216,7 +223,7 @@ impl ASTNode {
 fn is_scalar(node: &ASTNode) -> bool {
     match node {
         ASTNode::Scalar(_) => true,
-        ASTNode::Variable { var_type, .. } => var_type == &VarType::Scalar,
+        ASTNode::VariableS { .. } => true,
         ASTNode::AtVec(_, _) => true,
         ASTNode::AtMat(_, _, _) => true,
         _ => false,
@@ -224,11 +231,25 @@ fn is_scalar(node: &ASTNode) -> bool {
 }
 
 
+// TODO: I will collect all the sizes of variables in a place, and use this function to get the size of a variable
+fn get_size(name: &str) -> usize {
+    let mut size = 0;
+    for c in name.chars() {
+        if c.is_digit(10) {
+            size = size * 10 + c.to_digit(10).unwrap() as usize;
+        }
+    }
+    size
+}
+
+
 impl fmt::Display for ASTNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ASTNode::Scalar(value) => write!(f, "{}", value),
-            ASTNode::Variable { name, .. } => write!(f, "{}", name),
+            ASTNode::VariableS { name } => write!(f, "{}", name),
+            ASTNode::VariableV { name } => write!(f, "{}", name),
+            ASTNode::VariableM { name } => write!(f, "{}", name),
             ASTNode::Vector(nodes) => {
                 // Print vectors in a single line
                 let elements = nodes.iter()
