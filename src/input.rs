@@ -1,128 +1,140 @@
 // The functions in the file should be called first, even if there is no input,
 // for the functions here will also define the function and include the libraries
 // This file will be no longer needed when we move away from daisy
-//use crate::config::{get_mode, Mode, TEMP_COUNTER};
-//use std::ops::{Add, Sub, Mul};
+use crate::helper::{Input, VarType};
 
-// add the struct from helper.rs
-use crate::helper::{Input, VarType, Bounds};
-
-
-
-
-// set input func
-// the only input will be a set of vectors, matrices, and scalars
-// in the future I should merge these three with a trait, but now it can wait
 pub fn set_funcs(
     name: &str,
-    return_type: VarType, // this is terrible, but I will fix it later, I should use an enum when I merge all variables
+    return_type: VarType,
     inputs: Vec<Input>,
 ) {
-    // firstly print the initialization
-    println!("import daisy.lang._\nimport Real._\nimport daisy.lang.Vector._\n\nobject RustOutput {{\n");
+    // Print imports and object name
+    println!("import daisy.lang._");
+    println!("import Real._");
+    println!("import daisy.lang.Vector._");
+    println!();
+    println!("object RustOutput {{\n");
 
-    // print the function name
-    print!("\tdef {}(", name);
+    // Start building the function definition line
+    let mut func_sig = format!("\tdef {}(", name);
 
-    // print the inputs
-    for input in inputs.iter() {
-        match input {
-            Input::Scalar(name, _) => {
-                print!("\n\t\t{}: Real,", name);
-            }
-            Input::Vector(name, _) => {
-                print!("\n\t\t{}: Vector,", name);
-            }
-            Input::Matrix(name, _) => {
-                print!("\n\t\t{}: Matrix,", name);
-            }
-        }
+    // Collect parameter strings
+    let mut params = Vec::new();
+    for input in &inputs {
+        let param_str = match input {
+            Input::Scalar(n, _) => format!("\n\t\t{}: Real", n),
+            Input::Vector(n, _) => format!("\n\t\t{}: Vector", n),
+            Input::Matrix(n, _) => format!("\n\t\t{}: Matrix", n),
+        };
+        params.push(param_str);
     }
 
-    // now, delete one character from the end
-    print!("\x08");
-    
-
-    // the rest is \n\t\t): return_type = {")
-    match return_type {
-        VarType::Scalar => {
-            println!("): Real = {{");
-        }
-        VarType::Vector => {
-            println!("): Vector = {{");
-        }
-        VarType::Matrix => {
-            println!("): Matrix = {{");
-        }
+    // Join parameters with commas, and append to the function signature
+    if !params.is_empty() {
+        func_sig.push_str(&params.join(","));
     }
+    // Close the parameter list
+    func_sig.push(')');
 
-    // then, we will start to write the bounds
+    // Add the return type
+    let return_str = match return_type {
+        VarType::Scalar => "Real",
+        VarType::Vector => "Vector",
+        VarType::Matrix => "Matrix",
+    };
+    func_sig.push_str(&format!(": {} = {{", return_str));
+    println!("{}", func_sig);
 
-    print!("\t\trequire(");
+    // Now we print the require(...) line with all constraints
+    // We'll build the inside of the require(...) call
+    let mut require_lines = Vec::new();
 
-    // now, we will print the bounds
-    for input in inputs.iter() {
+    for input in &inputs {
         match input {
-            Input::Scalar(name, bounds) => {
-                println!("\n\t\t\t{} >= {} && {} <= {} && {}.size(1) &&", name, bounds.lower_bound, name, bounds.upper_bound, name);
-                println!("\t\t\t{}.specV(Set(", name);
-                println!("\t\t\t\t((0, 0), ({}, {})),", bounds.lower_bound, bounds.upper_bound);
-                print!("\t\t\t)) &&");
+            Input::Scalar(n, b) => {
+                // Scalar bounds
+                // condition: n >= lower && n <= upper && n.size(1)
+                // specV: ((0,0), (lower,upper))
+                require_lines.push(format!("{} >= {} && {} <= {} && {}.size(1) &&",
+                    n, b.lower_bound, n, b.upper_bound, n));
+
+                require_lines.push(format!("{}.specV(Set(\n\t\t\t\t((0, 0), ({}, {}))\n\t\t\t)) &&",
+                    n, b.lower_bound, b.upper_bound));
             }
-            Input::Vector(name, bounds) => {
+            Input::Vector(n, bounds) => {
+                // Vector bounds
                 let size = bounds.len();
-                let min_bound: f64 = bounds
-                    .iter()
-                    .map(|b| b.lower_bound)
-                    .fold(f64::INFINITY, |a, b| a.min(b)); // Use `min` from `f64` directly
-                let max_bound: f64 = bounds
-                    .iter()
-                    .map(|b| b.upper_bound)
-                    .fold(f64::NEG_INFINITY, |a, b| a.max(b)); // Use `max` from `f64` directly
+                let min_bound = bounds.iter().map(|b| b.lower_bound).fold(f64::INFINITY, f64::min);
+                let max_bound = bounds.iter().map(|b| b.upper_bound).fold(f64::NEG_INFINITY, f64::max);
 
-                println!("\n\t\t\t{} >= {} && {} <= {} && {}.size({}) &&", name, min_bound, name, max_bound, name, size);
-                
-                // print the bounds
-                println!("\t\t\t{}.specV(Set(", name);
+                require_lines.push(format!("{} >= {} && {} <= {} && {}.size({}) &&",
+                    n, min_bound, n, max_bound, n, size));
+
+                // specV entries
+                require_lines.push(format!("{}.specV(Set(", n));
                 for i in 0..size {
-                    println!("\t\t\t\t(({}, {}), ({}, {})),", i, i, bounds[i].lower_bound, bounds[i].upper_bound);
+                    let b = &bounds[i];
+                    require_lines.push(format!("\t\t\t\t(({}, {}), ({}, {})),", i, i, b.lower_bound, b.upper_bound));
                 }
-                print!("\t\t\t)) &&");
-            }
-            Input::Matrix(name, bounds) => {
-                let size_col = bounds.len();
-                let size_row = bounds[0].len();
-                let min_bound: f64 = bounds
-                    .iter()
-                    .map(|b| b.iter().map(|b| b.lower_bound).fold(f64::INFINITY, |a, b| a.min(b)))
-                    .fold(f64::INFINITY, |a, b| a.min(b)); // Use `min` from `f64` directly
-                let max_bound: f64 = bounds
-                    .iter()
-                    .map(|b| b.iter().map(|b| b.upper_bound).fold(f64::NEG_INFINITY, |a, b| a.max(b)))
-                    .fold(f64::NEG_INFINITY, |a, b| a.max(b)); // Use `max` from `f64` directly
-
-                println!("\n\t\t\t{} >= {} && {} <= {} && {}.size({}, {}) &&", name, min_bound, name, max_bound, name, size_col, size_row);
-
-                println!("\t\t\t{}.specV(Set(", name);
-                
-                // print the bounds
-                for i in 0..size_col {
-                    for j in 0..size_row {
-                        println!("\t\t\t\t(({}, {}), ({}, {})),", i, j, bounds[i][j].lower_bound, bounds[i][j].upper_bound);
+                // Remove the trailing comma from last specV entry
+                if let Some(last) = require_lines.last_mut() {
+                    if last.ends_with(",") {
+                        last.pop();
                     }
                 }
+                require_lines.push(")) &&".to_string());
+            }
+            Input::Matrix(n, bounds) => {
+                // Matrix bounds
+                let size_col = bounds.len();
+                let size_row = if size_col > 0 { bounds[0].len() } else { 0 };
 
-                print!("\t\t\t)) &&");
+                let min_bound = bounds.iter().flat_map(|row| row.iter().map(|b| b.lower_bound))
+                    .fold(f64::INFINITY, f64::min);
+                let max_bound = bounds.iter().flat_map(|row| row.iter().map(|b| b.upper_bound))
+                    .fold(f64::NEG_INFINITY, f64::max);
+
+                require_lines.push(format!("{} >= {} && {} <= {} && {}.size({}, {}) &&",
+                    n, min_bound, n, max_bound, n, size_col, size_row));
+
+                require_lines.push(format!("{}.specV(Set(", n));
+                for i in 0..size_col {
+                    for j in 0..size_row {
+                        let b = &bounds[i][j];
+                        require_lines.push(format!("\t\t\t\t(({}, {}), ({}, {})),", i, j, b.lower_bound, b.upper_bound));
+                    }
+                }
+                // Remove the trailing comma from the last entry
+                if let Some(last) = require_lines.last_mut() {
+                    if last.ends_with(",") {
+                        last.pop();
+                    }
+                }
+                require_lines.push(")) &&".to_string());
             }
         }
     }
 
-    // delete the last &&
-    print!("\x08\x08");
-    print!(")");
+    // Remove the last '&&' from require lines if present
+    if let Some(last) = require_lines.last_mut() {
+        if last.ends_with("&&") {
+            let trimmed = last.trim_end_matches('&').trim();
+            *last = trimmed.to_string();
+        }
+    }
 
+    // Print require(...) block
+    print!("\t\trequire(");
+    if !require_lines.is_empty() {
+        println!();
+        for line in &require_lines {
+            println!("\t\t\t{}", line);
+        }
+        print!("\t\t)");
+    } else {
+        // If no constraints, just close require immediately
+        print!(")");
+    }
 
-
-} 
-
-
+    println!("\n\n");
+}
