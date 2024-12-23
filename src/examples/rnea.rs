@@ -1,9 +1,9 @@
 
 use core::panic;
 
-use crate::helper::{VarType, Input, Bounds};
+//use crate::helper::{VarType, Input, Bounds};
 use crate::ast::ASTNode;
-use crate::{Vector, Matrix, Scalar};
+use crate::{Vector, Matrix};
 
 
 fn validate_vector(node: &ASTNode, name: &str) {
@@ -20,9 +20,9 @@ fn act_inv(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, angular:
     let act_inv1 = translation.clone().cross(angular_parent.clone()).define(format!("actInv1_{}", joint_id).as_str());
     let act_inv2 = (linear_parent.clone() - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
     let act_inv3 = rotation.clone().transpose().define(format!("actInv3_{}", joint_id).as_str());
-    let act_inv4 = (act_inv3.clone() * act_inv2).define(format!("actInv4_{}", joint_id).as_str());
+    let act_inv4 = (act_inv3.clone().cross(act_inv2)).define(format!("actInv4_{}", joint_id).as_str());
     let new_linear = (linear.clone() + act_inv4).define(format!("act_inv_linear_{}", joint_id).as_str());
-    let act_inv5 = (act_inv3.clone() * angular_parent.clone()).define(format!("actInv5_{}", joint_id).as_str());
+    let act_inv5 = (act_inv3.clone().cross(angular_parent.clone())).define(format!("actInv5_{}", joint_id).as_str());
     let new_angular = (angular.clone() + act_inv5).define(format!("act_inv_angular_{}", joint_id).as_str());
 
     (new_linear, new_angular)
@@ -86,17 +86,17 @@ fn alpha_cross_angular(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
 // vout_[1] = S3.m_data(1) * vin[0] + S3.m_data(2) * vin[1] + S3.m_data(4) * vin[2];
 // vout_[2] = S3.m_data(3) * vin[0] + S3.m_data(4) * vin[1] + S3.m_data(5) * vin[2];
 fn rhs_mult(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
-    let vout_0_0 = inertia.clone().at_mat(0, 0) * vin.clone().at_vec(0);
-    let vout_0_1 = inertia.clone().at_mat(0, 1) * vin.clone().at_vec(1);
-    let vout_0_2 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(2);
+    let vout_0_0 = (inertia.clone().at_mat(0, 0) * vin.clone().at_vec(0)).define("");
+    let vout_0_1 = (inertia.clone().at_mat(0, 1) * vin.clone().at_vec(1)).define("");
+    let vout_0_2 = (inertia.clone().at_mat(0, 2) * vin.clone().at_vec(2)).define("");
 
-    let vout_1_0 = inertia.clone().at_mat(0, 1) * vin.clone().at_vec(0);
-    let vout_1_1 = inertia.clone().at_mat(1, 1) * vin.clone().at_vec(1);
-    let vout_1_2 = inertia.clone().at_mat(1, 2) * vin.clone().at_vec(2);
+    let vout_1_0 = (inertia.clone().at_mat(0, 1) * vin.clone().at_vec(0)).define("");
+    let vout_1_1 = (inertia.clone().at_mat(1, 1) * vin.clone().at_vec(1)).define("");
+    let vout_1_2 = (inertia.clone().at_mat(1, 2) * vin.clone().at_vec(2)).define("");
 
-    let vout_2_0 = inertia.clone().at_mat(0, 2) * vin.clone().at_vec(0);
-    let vout_2_1 = inertia.clone().at_mat(1, 2) * vin.clone().at_vec(1);
-    let vout_2_2 = inertia.clone().at_mat(2, 2) * vin.clone().at_vec(2);
+    let vout_2_0 = (inertia.clone().at_mat(0, 2) * vin.clone().at_vec(0)).define("");
+    let vout_2_1 = (inertia.clone().at_mat(1, 2) * vin.clone().at_vec(1)).define("");
+    let vout_2_2 = (inertia.clone().at_mat(2, 2) * vin.clone().at_vec(2)).define("");
 
     let rhs_mult1_temp = (vout_0_0 + vout_0_1).define(format!("rhsMult1_temp_{}", joint_id).as_str());
     let rhs_mult1 = (rhs_mult1_temp + vout_0_2).define(format!("rhsMult1_{}", joint_id).as_str());
@@ -137,8 +137,8 @@ fn act(
         f.clone().at_vec(5)
     ).define(format!("f_angular_{}", joint_id).as_str());
 
-    let new_f_linear = (rotation.clone() * f_linear.clone()).define(format!("new_f_linear_{}", joint_id).as_str());
-    let new_f_angular = (rotation.clone() * f_angular.clone()).define(format!("new_f_angular_temp_{}", joint_id).as_str());
+    let new_f_linear = (rotation.clone().cross(f_linear.clone())).define(format!("new_f_linear_{}", joint_id).as_str());
+    let new_f_angular = (rotation.clone().cross(f_angular.clone())).define(format!("new_f_angular_temp_{}", joint_id).as_str());
 
     let f_angular_cross = translation.clone().cross(new_f_linear.clone()).define(format!("f_angular_cross_{}", joint_id).as_str());
 
@@ -237,7 +237,7 @@ fn first_pass(
     //data.a_gf[i] = jdata.c() + (data.v[i] ^ jdata.v());
     // ^ operator is actually implemented in pinocchio/include/pinocchio/spatial/cartesian-axis.hpp inline void CartesianAxis<2>::alphaCross
     // vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-    let minus_m_w = -(v.clone().at_vec(joint_id)).define(format!("minus_m_w_{}", joint_id).as_str());
+    let minus_m_w = (-(v.clone().at_vec(joint_id))).define(format!("minus_m_w_{}", joint_id).as_str());
     let alpha_cross_linear = alpha_cross_linear(minus_m_w.clone(), new_v_linear.clone(), joint_id);
     let alpha_cross_angular = alpha_cross_angular(minus_m_w.clone(), new_v_angular.clone(), joint_id);
     
@@ -296,6 +296,7 @@ fn first_pass(
     // next line is f.angular() += lever().cross(f.linear());
     let h_angular_1 = levers[joint_id].clone().cross(h_linear.clone()).define(format!("h_angular_1_{}", joint_id).as_str());
     let h_angular_2 = (h_angular.clone() + h_angular_1).define(format!("h_angular_{}", joint_id).as_str());
+
 
 
     // next line is model.inertias[i].__mult__(data.a_gf[i],data.f[i]);
