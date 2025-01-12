@@ -431,7 +431,7 @@ fn sec_pass(
 /// \param[in] a The joint acceleration vector (dim model.nv).
 /// jointPlacements are model.jointPlacements in pinocchio, it is a vector of SE3 objects
 /// SE3 has a rotation and a translation element
-pub fn rnea(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
+pub fn rnea(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) -> ASTNode {
     // check if q, v, and a are ASTNode::Variable, or ASTNode::Vector
     // if they are not, return an error
     // if it is a variable, check if the variable is a vector
@@ -573,7 +573,7 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     // sec_pass will do its own iteration
     let (new_f, taus) = sec_pass(all_f, limi_rotations, &limi_translations, n_joints);
 
-
+    taus
 
 }
 
