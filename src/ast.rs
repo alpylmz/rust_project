@@ -192,7 +192,20 @@ impl ASTNode {
             ASTNode::AtVec(_, _) => VarType::Scalar,
             ASTNode::AtMat(_, _, _) => VarType::Scalar,
             ASTNode::Neg(child) => child.infer_type(),
-            ASTNode::Cross(_, _) => VarType::Vector,
+            ASTNode::Cross(child1, child2) => {
+                let child1_type = child1.infer_type();
+                let child2_type = child2.infer_type();
+
+                if child1_type == VarType::Vector && child2_type == VarType::Vector {
+                    VarType::Vector
+                } else if child1_type == VarType::Matrix && child2_type == VarType::Matrix {
+                    VarType::Matrix
+                } else if child1_type == VarType::Matrix && child2_type == VarType::Vector {
+                    VarType::Vector
+                } else {
+                    panic!("Cross product of different types is not allowed in this context")
+                }
+            }
             ASTNode::Transpose(_) => VarType::Matrix,
         }
     }
@@ -504,8 +517,7 @@ impl ASTNode {
                 }
                 else{
                     let all_vars = ALL_VARS.lock().unwrap();
-                    
-                    panic!("Cross product or matrix multiplication of {} and {} is not allowed in this context {:?}", lhs, rhs, all_vars);
+                    panic!("Cross product or matrix multiplication of {}: {} and {}: {} is not allowed in this context {:?}", lhs, lhs.get_type(), rhs, rhs.get_type(), all_vars);
                 }
             }
             _ => {
@@ -658,6 +670,27 @@ impl ASTNode {
             VarType::Matrix => ASTNode::VariableM{name: new_name},
         }
     }
+
+    // Function to use for debugging purposes, just print the type of the node
+    fn get_type(&self) -> String {
+        match self {
+            ASTNode::Scalar(_) => "Scalar".to_string(),
+            ASTNode::VariableS { .. } => "VariableS".to_string(),
+            ASTNode::VariableV { .. } => "VariableV".to_string(),
+            ASTNode::VariableM { .. } => "VariableM".to_string(),
+            ASTNode::Vector(_) => "Vector".to_string(),
+            ASTNode::Matrix(_) => "Matrix".to_string(),
+            ASTNode::Add(_, _) => "Add".to_string(),
+            ASTNode::Sub(_, _) => "Sub".to_string(),
+            ASTNode::Mul(_, _) => "Mul".to_string(),
+            ASTNode::AtVec(_, _) => "AtVec".to_string(),
+            ASTNode::AtMat(_, _, _) => "AtMat".to_string(),
+            ASTNode::Neg(_) => "Neg".to_string(),
+            ASTNode::Cross(_, _) => "Cross".to_string(),
+            ASTNode::Transpose(_) => "Transpose".to_string(),
+        }
+    }
+
 }
 
 fn is_scalar(node: &ASTNode) -> bool {
