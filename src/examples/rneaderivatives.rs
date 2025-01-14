@@ -218,7 +218,11 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
     //      res.template block<3,3>(ANGULAR,ANGULAR) = -skewSquare(mv.linear(),lever()) - skewSquare(lever(),mv.linear());
     let skew_second_first = skew_square(&mv_linear, translation);
     let skew_second_second = skew_square(translation, &mv_linear);
-    let skew_second_second_neg = (-skew_second_second).define("skew_second_second_neg");
+    let skew_second_second_neg = Matrix!(
+        [-skew_second_first.clone().at_mat(0, 0), -skew_second_first.clone().at_mat(0, 1), -skew_second_first.clone().at_mat(0, 2)],
+        [-skew_second_first.clone().at_mat(1, 0), -skew_second_first.clone().at_mat(1, 1), -skew_second_first.clone().at_mat(1, 2)],
+        [-skew_second_first.clone().at_mat(2, 0), -skew_second_first.clone().at_mat(2, 1), -skew_second_first.clone().at_mat(2, 2)]
+    ).define("skew_second_second_neg");
     let res_second = (skew_second_second_neg - skew_second_first).define("res_second");
 
     //      res.template block<3,3>(LINEAR,LINEAR) = (inertia() - AlphaSkewSquare(mass(),lever())).matrix();
