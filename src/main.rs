@@ -3,7 +3,7 @@ mod helper;
 mod config;
 mod ast;
 mod examples;
-use examples::{ex1, inversempc, rnea};
+use examples::{ex1, inversempc, rnea, rneaderivatives};
 
 use crate::ast::ASTNode;
 
@@ -45,6 +45,6 @@ fn main() {
 
 
     //rnea::rnea(qsin, qcos, v, a);
-    inversempc::solver(q, qsin, qcos, us, xgoal);
-    
+    //inversempc::solver(q, qsin, qcos, us, xgoal);
+    rneaderivatives::rneaderivatives(qsin, qcos, v, a);
 }
