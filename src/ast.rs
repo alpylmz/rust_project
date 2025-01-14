@@ -700,6 +700,9 @@ fn is_scalar(node: &ASTNode) -> bool {
         ASTNode::AtVec(_, _) => true,
         ASTNode::AtMat(_, _, _) => true,
         ASTNode::Neg(a) => is_scalar(a),
+        ASTNode::Mul(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs), // needs better handling, dot product etc.
+        ASTNode::Add(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs),
+        ASTNode::Sub(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs),
         _ => false,
     }
 }
@@ -709,6 +712,9 @@ fn is_vector(node: &ASTNode) -> bool {
         ASTNode::Vector(_) => true,
         ASTNode::VariableV { .. } => true,
         ASTNode::Neg(a) => is_vector(a),
+        ASTNode::Mul(lhs, rhs) => is_vector(lhs) || is_vector(rhs),
+        ASTNode::Add(lhs, rhs) => is_vector(lhs) && is_vector(rhs),
+        ASTNode::Sub(lhs, rhs) => is_vector(lhs) && is_vector(rhs),
         _ => false,
     }
 }
@@ -718,6 +724,10 @@ fn is_matrix(node: &ASTNode) -> bool {
         ASTNode::Matrix(_) => true,
         ASTNode::VariableM { .. } => true,
         ASTNode::Neg(a) => is_matrix(a),
+        ASTNode::Mul(lhs, rhs) => is_matrix(lhs) || is_matrix(rhs),
+        ASTNode::Add(lhs, rhs) => is_matrix(lhs) && is_matrix(rhs),
+        ASTNode::Sub(lhs, rhs) => is_matrix(lhs) && is_matrix(rhs),
+        ASTNode::Cross(lhs, rhs) => is_matrix(lhs) && is_matrix(rhs),
         _ => false,
     }
 }
