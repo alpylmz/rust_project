@@ -4,7 +4,7 @@
 
 /* @pre: ((cos_qpos_0 > -1.0) && (cos_qpos_0 < 1.0) && (cos_qpos_1 > -1.0) && (cos_qpos_1 < 1.0) && (cos_qpos_2 > -1.0) && (cos_qpos_2 < 1.0) && (cos_qpos_3 > -1.0) && (cos_qpos_3 < 1.0) && (cos_qpos_4 > -1.0) && (cos_qpos_4 < 1.0) && (cos_qpos_5 > -1.0) && (cos_qpos_5 < 1.0) && (sin_qpos_0 > -1.0) && (sin_qpos_0 < 1.0) && (sin_qpos_1 > -1.0) && (sin_qpos_1 < 1.0) && (sin_qpos_2 > -1.0) && (sin_qpos_2 < 1.0) && (sin_qpos_3 > -1.0) && (sin_qpos_3 < 1.0) && (sin_qpos_4 > -1.0) && (sin_qpos_4 < 1.0) && (sin_qpos_5 > -1.0) && (sin_qpos_5 < 1.0)) */
 /* @post: (res) => (res +/- 1.0e-05) */
-double rand_func(
+double rnea(
     double qcos_0, double qcos_1, double qcos_2, double qcos_3, double qcos_4, double qcos_5, 
     double qsin_0, double qsin_1, double qsin_2, double qsin_3, double qsin_4, double qsin_5,
     double v_0, double v_1, double v_2, double v_3, double v_4, double v_5,
@@ -1785,7 +1785,7 @@ int main(){
     std::vector<double> cos_qpos = {cos(q[0]), cos(q[1]), cos(q[2]), cos(q[3]), cos(q[4]), cos(q[5])};
     std::vector<double> sin_qpos = {sin(q[0]), sin(q[1]), sin(q[2]), sin(q[3]), sin(q[4]), sin(q[5])};
 
-    rand_func(
+    rnea(
         cos_qpos[0], cos_qpos[1], cos_qpos[2], cos_qpos[3], cos_qpos[4], cos_qpos[5],
         sin_qpos[0], sin_qpos[1], sin_qpos[2], sin_qpos[3], sin_qpos[4], sin_qpos[5],
         v[0], v[1], v[2], v[3], v[4], v[5],

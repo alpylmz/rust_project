@@ -4,11 +4,7 @@
 
 /* @pre: ((qcos_0 > -1.0) && (qcos_0 < 1.0) && (qcos_1 > -1.0) && (qcos_1 < 1.0) && (qcos_2 > -1.0) && (qcos_2 < 1.0) && (qcos_3 > -1.0) && (qcos_3 < 1.0) && (qcos_4 > -1.0) && (qcos_4 < 1.0) && (qcos_5 > -1.0) && (qcos_5 < 1.0) && (qsin_0 > -1.0) && (qsin_0 < 1.0) && (qsin_1 > -1.0) && (qsin_1 < 1.0) && (qsin_2 > -1.0) && (qsin_2 < 1.0) && (qsin_3 > -1.0) && (qsin_3 < 1.0) && (qsin_4 > -1.0) && (qsin_4 < 1.0) && (qsin_5 > -1.0) && (qsin_5 < 1.0) && (v_0 > -1.0) && (v_0 < 1.0) && (v_1 > -1.0) && (v_1 < 1.0) && (v_2 > -1.0) && (v_2 < 1.0) && (v_3 > -1.0) && (v_3 < 1.0) && (v_4 > -1.0) && (v_4 < 1.0) && (v_5 > -1.0) && (v_5 < 1.0) && (a_0 > -1.0) && (a_0 < 1.0) && (a_1 > -1.0) && (a_1 < 1.0) && (a_2 > -1.0) && (a_2 < 1.0) && (a_3 > -1.0) && (a_3 < 1.0) && (a_4 > -1.0) && (a_4 < 1.0) && (a_5 > -1.0) && (a_5 < 1.0)) */
 /* @post: (res) => (res +/- 0.1) */
-ap_fixed<16,9> rnea(
-    ap_fixed<16,2> qcos_0, ap_fixed<16,2> qcos_1, ap_fixed<16,2> qcos_2, ap_fixed<16,2> qcos_3, ap_fixed<16,2> qcos_4, ap_fixed<16,2> qcos_5, 
-    ap_fixed<16,2> qsin_0, ap_fixed<16,2> qsin_1, ap_fixed<16,2> qsin_2, ap_fixed<16,2> qsin_3, ap_fixed<16,2> qsin_4, ap_fixed<16,2> qsin_5, 
-    ap_fixed<16,2> v_0, ap_fixed<16,2> v_1, ap_fixed<16,2> v_2, ap_fixed<16,2> v_3, ap_fixed<16,2> v_4, ap_fixed<16,2> v_5, 
-    ap_fixed<16,2> a_0, ap_fixed<16,2> a_1, ap_fixed<16,2> a_2, ap_fixed<16,2> a_3, ap_fixed<16,2> a_4, ap_fixed<16,2> a_5) {
+ap_fixed<16,14> rnea(ap_fixed<16,2> qcos_0, ap_fixed<16,2> qcos_1, ap_fixed<16,2> qcos_2, ap_fixed<16,2> qcos_3, ap_fixed<16,2> qcos_4, ap_fixed<16,2> qcos_5, ap_fixed<16,2> qsin_0, ap_fixed<16,2> qsin_1, ap_fixed<16,2> qsin_2, ap_fixed<16,2> qsin_3, ap_fixed<16,2> qsin_4, ap_fixed<16,2> qsin_5, ap_fixed<16,2> v_0, ap_fixed<16,2> v_1, ap_fixed<16,2> v_2, ap_fixed<16,2> v_3, ap_fixed<16,2> v_4, ap_fixed<16,2> v_5, ap_fixed<16,2> a_0, ap_fixed<16,2> a_1, ap_fixed<16,2> a_2, ap_fixed<16,2> a_3, ap_fixed<16,2> a_4, ap_fixed<16,2> a_5) {
   ap_fixed<16,1> limi_translation_0_0 = 0.0;
   ap_fixed<16,1> limi_translation_0_1 = 0.0;
   ap_fixed<16,1> limi_translation_0_2 = 0.333;
@@ -2424,6 +2420,6 @@ ap_fixed<16,9> rnea(
   ap_fixed<16,12> data_tau_3 = data_tau_temp_3;
   ap_fixed<16,10> data_tau_4 = data_tau_temp_4;
   ap_fixed<16,9> data_tau_5 = data_tau_temp_5;
-  return data_tau_5;
-} // [-178.18239642865956, 178.18239642865956] +/- 1.0812885031573387
+  return data_tau_0;
+} // [-6840.754675036173, 6840.754675036173] +/- 41.55314644619983
 
