@@ -445,6 +445,39 @@ fn act_motion(
 
     new_f
 }
+
+// not to be confused with motionAction. 
+// in C++, pinocchio/include/pinocchio/spatial/force-dense.hpp:
+// f.linear().noalias() = m.rotation()*linear();
+// f.angular().noalias() = m.rotation()*angular();
+// f.angular() += m.translation().cross(f.linear());
+fn act_motion1(
+    rotation: ASTNode, 
+    translation: ASTNode, 
+    f_linear: ASTNode, 
+    f_angular: ASTNode, 
+    joint_id: usize
+) -> ASTNode {
+
+    let new_f_linear = (rotation.clone().cross(f_linear.clone())).define(format!("new_f_linear_{}", joint_id).as_str());
+    let new_f_angular = (rotation.clone().cross(f_angular.clone())).define(format!("new_f_angular_temp_{}", joint_id).as_str());
+
+    let f_angular_cross = translation.clone().cross(new_f_linear.clone()).define(format!("f_angular_cross_{}", joint_id).as_str());
+
+    let new_f_angular = (new_f_angular.clone() + f_angular_cross.clone()).define(format!("new_f_angular_{}", joint_id).as_str());
+
+    let new_f = Vector!(
+        new_f_linear.clone().at_vec(0),
+        new_f_linear.clone().at_vec(1),
+        new_f_linear.clone().at_vec(2),
+        new_f_angular.clone().at_vec(0),
+        new_f_angular.clone().at_vec(1),
+        new_f_angular.clone().at_vec(2)
+    ).define(format!("new_f_{}", joint_id).as_str());
+
+    new_f
+}
+
 // I strongly disagree with this function's name, but it is actInv in pinocchio,
 // so I will leave it as is for now
 fn act_motion_inv(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, angular: &ASTNode, linear_parent: ASTNode, angular_parent: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
@@ -571,7 +604,11 @@ fn symmetric3_rotate(
 //    Sres.m_data(1) += r(2); Sres.m_data(2)+= m_data(5);
 //    Sres.m_data(3) +=-r(1); Sres.m_data(4)+= r(0); Sres.m_data(5) += m_data(5);
 
-    let sres_update_0 = l.clone().at_mat(0, 0) + l.clone().at_mat(1, 1) - sres_first_2.clone() - sres_first_5.clone();
+    // let sres_update_0 = l.clone().at_mat(0, 0) + l.clone().at_mat(1, 1) - sres_first_2.clone() - sres_first_5.clone();
+    let sres_update_0_tmp1 = (l.clone().at_mat(0, 0) + l.clone().at_mat(1, 1)).define("sres_update_0_tmp1");
+    let sres_update_0_tmp2 = (sres_first_2.clone() + sres_first_5.clone()).define("sres_update_0_tmp2");
+    let sres_update_0 = (sres_update_0_tmp1.clone() - sres_update_0_tmp2.clone()).define("sres_update_0");
+
 
     let sres_final_0 = sres_update_0 + s.clone().at_mat(2, 2);
     let sres_final_1 = sres_first_1.clone() + const_r.clone().at_vec(2);
@@ -584,9 +621,9 @@ fn symmetric3_rotate(
     // res(1,0) = m_data(1); res(1,1) = m_data(2); res(1,2) = m_data(4);
     // res(2,0) = m_data(3); res(2,1) = m_data(4); res(2,2) = m_data(5);
     let sres = Matrix!(
-        [sres_final_0, sres_final_1.clone(), sres_final_2.clone()],
-        [sres_final_1, sres_final_3, sres_final_4.clone()],
-        [sres_final_2, sres_final_4, sres_final_5]
+        [sres_final_0, sres_final_1.clone(), sres_final_3.clone()],
+        [sres_final_1, sres_final_2, sres_final_4.clone()],
+        [sres_final_3, sres_final_4, sres_final_5]
     ).define("symmetric3_rotate");
 
     sres
@@ -733,13 +770,13 @@ fn first_pass(
     // I couldn't print out info about jdata.S() easily but it is ConstraintRevoluteTpl, and I believe the only thing this line does is
     // data.a_gf[i][5] = jmodel.jointVelocitySelector(a)
     
-    let new_data_a = Vector!(
+    let mut new_data_a = Vector!(
         alpha_cross_linear.clone().at_vec(0),
         alpha_cross_linear.clone().at_vec(1),
         alpha_cross_linear.clone().at_vec(2),
         alpha_cross_angular.clone().at_vec(0),
         alpha_cross_angular.clone().at_vec(1),
-        alpha_cross_angular.clone().at_vec(2)
+        a.clone().at_vec(joint_id)
     ).define(format!("new_data_a{}", joint_id).as_str());
 
     //if(parent > 0)
@@ -747,20 +784,24 @@ fn first_pass(
     //    data.a[i] += data.liMi[i].actInv(data.a[parent]);
     //  }
 
-    let limi_actInv_a_parent = act_motion_inv(&limi_translation, &limi_rotation, &alpha_cross_linear, &alpha_cross_angular, parent_a_linear, parent_a_angular, joint_id);
+    match joint_id {
+        0 | 1 => (),
+        _ => {
+            let limi_actInv_a_parent = act_motion_inv(&limi_translation, &limi_rotation, &alpha_cross_linear, &alpha_cross_angular, parent_a_linear, parent_a_angular, joint_id);
     
-    let new_data_a_addition = Vector!(
-        limi_actInv_a_parent.0.clone().at_vec(0),
-        limi_actInv_a_parent.0.clone().at_vec(1),
-        limi_actInv_a_parent.0.clone().at_vec(2),
-        limi_actInv_a_parent.1.clone().at_vec(0),
-        limi_actInv_a_parent.1.clone().at_vec(1),
-        limi_actInv_a_parent.1.clone().at_vec(2)
-    ).define(format!("new_data_a_addition_{}", joint_id).as_str());
+            let new_data_a_addition = Vector!(
+                limi_actInv_a_parent.0.clone().at_vec(0),
+                limi_actInv_a_parent.0.clone().at_vec(1),
+                limi_actInv_a_parent.0.clone().at_vec(2),
+                limi_actInv_a_parent.1.clone().at_vec(0),
+                limi_actInv_a_parent.1.clone().at_vec(1),
+                limi_actInv_a_parent.1.clone().at_vec(2)
+            ).define(format!("new_data_a_addition_{}", joint_id).as_str());
+        
+            new_data_a = (new_data_a.clone() + new_data_a_addition).define(format!("new_data_a2_{}", joint_id).as_str());        
+        }
+    }
 
-
-    let new_data_a2 = (new_data_a.clone() + new_data_a_addition).define(format!("new_data_a2_{}", joint_id).as_str());
-    
     // all of these act functions are different than rnea.rs
     // data.oYcrb[i] = data.oinertias[i] = data.oMi[i].act(model.inertias[i]);
     let (data_oycrb_trans_i, data_oycrb_rot_i) = act_inertia(&oMis[joint_id].0, &oMis[joint_id].1, masses, &levers[joint_id], &inertias[joint_id]);
@@ -768,12 +809,12 @@ fn first_pass(
     let data_oinertias_rot_i = data_oycrb_rot_i.clone().define(format!("data_oinertias_rot_{}", joint_id).as_str());
 
     // ov = data.oMi[i].act(data.v[i]);
-    let ov = act_motion(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), v.clone(), joint_id).define(format!("ov_{}", joint_id).as_str());
+    let ov = act_motion1(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_v_linear.clone(), new_v_angular.clone(), joint_id).define(format!("ov_{}", joint_id).as_str());
     // oa = data.oMi[i].act(data.a[i]);
-    let oa = act_motion(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_data_a2.clone(), joint_id).define(format!("oa_{}", joint_id).as_str());
+    let oa = act_motion(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_data_a.clone(), joint_id).define(format!("oa_{}", joint_id).as_str());
 
     //oa_gf = oa - model.gravity; // add gravity contribution
-    let model_gravity = Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("model_gravity");
+    let model_gravity = Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("model_gravity");
     let oa_gf = (oa.clone() - model_gravity.clone()).define(format!("oa_gf_{}", joint_id).as_str());
 
 
@@ -802,7 +843,7 @@ fn first_pass(
     let data_oh_angular_temp = rhs_mult(data_oycrb_rot_i.clone(), ov_angular.clone(), joint_id);
     let data_oh_angular_temp2 = data_oycrb_trans_i.clone().cross(data_oh_linear.clone()).define(format!("data_oh_angular_temp2_{}", joint_id).as_str());
     let data_oh_angular = (data_oh_angular_temp.clone() + data_oh_angular_temp2.clone()).define(format!("data_oh_angular_{}", joint_id).as_str());
-
+    
     //data.of[i] = data.oYcrb[i] * oa_gf + ov.cross(data.oh[i]);
     // cross is ov.cross(data.oh[i]), so v is ov, linear() is oh_linear and angular() is oh_angular
     // the cross here is not the regular cross product since the vectors are 6D
@@ -828,24 +869,25 @@ fn first_pass(
         oa_gf.clone().at_vec(5)
     ).define(format!("oa_gf_angular_{}", joint_id).as_str());
 
-    let data_of_linear_temp1 = data_oycrb_trans_i.clone().cross(oa_gf_angular.clone()).define(format!("data_oh_linear_temp1_{}", joint_id).as_str());
-    let data_of_linear_temp2 = (oa_gf_linear.clone() - data_of_linear_temp1.clone()).define(format!("data_oh_linear_temp2_{}", joint_id).as_str());
-    let data_of_linear_temp3 = (masses.clone().at_vec(joint_id) * data_of_linear_temp2.clone()).define(format!("data_oh_linear_{}", joint_id).as_str());
+    let data_of_linear_temp1 = data_oycrb_trans_i.clone().cross(oa_gf_angular.clone()).define(format!("data_of_linear_temp1_{}", joint_id).as_str());
+    let data_of_linear_temp2 = (oa_gf_linear.clone() - data_of_linear_temp1.clone()).define(format!("data_of_linear_temp2_{}", joint_id).as_str());
+    let data_of_linear_temp3 = (masses.clone().at_vec(joint_id) * data_of_linear_temp2.clone()).define(format!("data_of_linear_temp3_{}", joint_id).as_str());
 
     let data_of_angular_temp = rhs_mult(data_oycrb_rot_i.clone(), oa_gf_angular.clone(), joint_id);
-    let data_of_angular_temp2 = data_oycrb_trans_i.clone().cross(data_of_linear_temp3.clone()).define(format!("data_oh_angular_temp2_{}", joint_id).as_str());
-    let data_of_angular_temp3 = (data_of_angular_temp.clone() + data_of_angular_temp2.clone()).define(format!("data_oh_angular_{}", joint_id).as_str());
+    let data_of_angular_temp2 = data_oycrb_trans_i.clone().cross(data_of_linear_temp3.clone()).define(format!("data_of_angular_temp2_{}", joint_id).as_str());
+    let data_of_angular_temp3 = (data_of_angular_temp.clone() + data_of_angular_temp2.clone()).define(format!("data_of_angular_temp3_{}", joint_id).as_str());
 
     // now ov.cross(data_oh[i])
-    let data_of_linear_temp4 = oa_gf_angular.clone().cross(data_oh_linear.clone()).define(format!("data_oh_linear_temp4_{}", joint_id).as_str());
+    let data_of_linear_temp4 = ov_angular.clone().cross(data_oh_linear.clone()).define(format!("data_of_linear_temp4_{}", joint_id).as_str());
 
-    let data_of_angular_temp4 = oa_gf_angular.clone().cross(data_oh_angular.clone()).define(format!("data_oh_angular_temp4_{}", joint_id).as_str());
-    let data_of_angular_temp5 = oa_gf_linear.clone().cross(data_oh_linear.clone()).define(format!("data_oh_angular_temp5_{}", joint_id).as_str());
-    let data_of_angular_temp6 = (data_of_angular_temp4.clone() + data_of_angular_temp5.clone()).define(format!("data_oh_angular_temp6_{}", joint_id).as_str());
+    let data_of_angular_temp4 = ov_angular.clone().cross(data_oh_angular.clone()).define(format!("data_of_angular_temp4_{}", joint_id).as_str());
+    let data_of_angular_temp5 = ov_linear.clone().cross(data_oh_linear.clone()).define(format!("data_of_angular_temp5_{}", joint_id).as_str());
+    let data_of_angular_temp6 = (data_of_angular_temp4.clone() + data_of_angular_temp5.clone()).define(format!("data_of_angular_temp6_{}", joint_id).as_str());
 
     let data_of_linear = (data_of_linear_temp3.clone() + data_of_linear_temp4.clone()).define(format!("data_of_linear_{}", joint_id).as_str());
     let data_of_angular = (data_of_angular_temp3.clone() + data_of_angular_temp6.clone()).define(format!("data_of_angular_{}", joint_id).as_str());
 
+    // correct until here
 
     // J_cols = data.oMi[i].act(jdata.S());
     // S is ConstraintRevoluteTpl, and this function can be found in:
