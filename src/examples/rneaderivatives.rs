@@ -229,7 +229,7 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
     let res_third = (rotation.clone() - alpha_skew_square(mass, translation)).define("res_third");
 
     // res.template block<3,3>(ANGULAR,ANGULAR) -= res.template block<3,3>(LINEAR,LINEAR) * skew(v.angular());
-    let res_fourth = (res_third.clone() * skew_vec3d(angular)).define("res_fourth");
+    let res_fourth = (res_third.clone().cross(skew_vec3d(angular))).define("res_fourth");
 
     let res_fifth = (res_second - res_fourth).define("res_fifth");
 
@@ -295,15 +295,7 @@ fn motionAction(v_linear: &ASTNode, v_angular: &ASTNode, linear: &ASTNode, angul
 }
 
 
-/// template<typename ForceDerived, typename M6>
-/// static void addForceCrossMatrix(const ForceDense<ForceDerived> & f,
-///                                 const Eigen::MatrixBase<M6> & mout)
-/// {
-///   M6 & mout_ = PINOCCHIO_EIGEN_CONST_CAST(M6,mout);
-///   addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::LINEAR,ForceDerived::ANGULAR));
-///   addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::LINEAR));
-///   addSkew(-f.angular(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::ANGULAR));
-/// }
+
 //  ///
 //  /// \brief Add skew matrix represented by a 3d vector to a given matrix,
 //  ///        i.e. add the antisymmetric matrix representation of the cross product operator (\f$ [v]_{\times} x = v \times x \f$)
@@ -324,7 +316,23 @@ fn motionAction(v_linear: &ASTNode, v_angular: &ASTNode, linear: &ASTNode, angul
 //    M_(1,0) += v[2];                            M_(1,2) -= v[0];
 //    M_(2,0) -= v[1];      M_(2,1) += v[0];                     ;
 //  }
-// I will implement add_skew here to simplify the process
+fn add_skew(m: &ASTNode, v: &ASTNode) -> ASTNode {
+    Matrix!(
+        [m.clone().at_mat(0, 0), m.clone().at_mat(0, 1) - v.clone().at_vec(2), m.clone().at_mat(0, 2) + v.clone().at_vec(1)],
+        [m.clone().at_mat(1, 0) + v.clone().at_vec(2), m.clone().at_mat(1, 1), m.clone().at_mat(1, 2) - v.clone().at_vec(0)],
+        [m.clone().at_mat(2, 0) - v.clone().at_vec(1), m.clone().at_mat(2, 1) + v.clone().at_vec(0), m.clone().at_mat(2, 2)]
+    ).define("add_skew")
+}
+
+/// template<typename ForceDerived, typename M6>
+/// static void addForceCrossMatrix(const ForceDense<ForceDerived> & f,
+///                                 const Eigen::MatrixBase<M6> & mout)
+/// {
+///   M6 & mout_ = PINOCCHIO_EIGEN_CONST_CAST(M6,mout);
+///   addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::LINEAR,ForceDerived::ANGULAR));
+///   addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::LINEAR));
+///   addSkew(-f.angular(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::ANGULAR));
+/// }
 fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNode) -> ASTNode {
     // the linear linear part will stay the same
     let linear_angular = Matrix!(
@@ -342,35 +350,35 @@ fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNod
         [mout.clone().at_mat(4, 3), mout.clone().at_mat(4, 4), mout.clone().at_mat(4, 5)],
         [mout.clone().at_mat(5, 3), mout.clone().at_mat(5, 4), mout.clone().at_mat(5, 5)]
     ).define("add_force_cross_angular_angular");
+
+    let minus_f_linear = Vector!(
+        -f_linear.clone().at_vec(0),
+        -f_linear.clone().at_vec(1),
+        -f_linear.clone().at_vec(2)
+    ).define("minus_f_linear");
+    let minus_f_angular = Vector!(
+        -f_angular.clone().at_vec(0),
+        -f_angular.clone().at_vec(1),
+        -f_angular.clone().at_vec(2)
+    ).define("minus_f_angular");
     // addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::LINEAR,ForceDerived::ANGULAR));
-    let linear_angular_1 = Matrix!(
-        [linear_angular.clone().at_mat(0, 0), linear_angular.clone().at_mat(0, 1) - f_linear.clone().at_vec(2), linear_angular.clone().at_mat(0, 2) + f_linear.clone().at_vec(1)],
-        [linear_angular.clone().at_mat(1, 0) + f_linear.clone().at_vec(2), linear_angular.clone().at_mat(1, 1), linear_angular.clone().at_mat(1, 2) - f_linear.clone().at_vec(0)],
-        [linear_angular.clone().at_mat(2, 0) - f_linear.clone().at_vec(1), linear_angular.clone().at_mat(2, 1) + f_linear.clone().at_vec(0), linear_angular.clone().at_mat(2, 2)]
-    ).define("add_force_cross_linear_angular_sec");
+    let res_linear_angular = add_skew(&linear_angular, &minus_f_linear).define("res_linear_angular");
     // addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::LINEAR));
-    let angular_linear_1 = Matrix!(
-        [angular_linear.clone().at_mat(0, 0) + f_linear.clone().at_vec(2), angular_linear.clone().at_mat(0, 1), angular_linear.clone().at_mat(0, 2) - f_linear.clone().at_vec(0)],
-        [angular_linear.clone().at_mat(1, 0), angular_linear.clone().at_mat(1, 1), angular_linear.clone().at_mat(1, 2)],
-        [angular_linear.clone().at_mat(2, 0) - f_linear.clone().at_vec(1), angular_linear.clone().at_mat(2, 1), angular_linear.clone().at_mat(2, 2) + f_linear.clone().at_vec(0)]
-    ).define("add_force_cross_angular_linear_sec");
+    let res_angular_linear = add_skew(&angular_linear, &minus_f_linear).define("res_angular_linear");
     // addSkew(-f.angular(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::ANGULAR));
-    let angular_angular_1 = Matrix!(
-        [angular_angular.clone().at_mat(0, 0), angular_angular.clone().at_mat(0, 1) - f_angular.clone().at_vec(2), angular_angular.clone().at_mat(0, 2) + f_angular.clone().at_vec(1)],
-        [angular_angular.clone().at_mat(1, 0) + f_angular.clone().at_vec(2), angular_angular.clone().at_mat(1, 1), angular_angular.clone().at_mat(1, 2) - f_angular.clone().at_vec(0)],
-        [angular_angular.clone().at_mat(2, 0) - f_angular.clone().at_vec(1), angular_angular.clone().at_mat(2, 1) + f_angular.clone().at_vec(0), angular_angular.clone().at_mat(2, 2)]
-    ).define("add_force_cross_angular_angular_sec");
+    let res_angular_angular = add_skew(&angular_angular, &minus_f_angular).define("res_angular_angular");
 
-    let res = Matrix!(
-        [linear_angular_1.clone().at_mat(0, 0), linear_angular_1.clone().at_mat(0, 1), linear_angular_1.clone().at_mat(0, 2), angular_linear_1.clone().at_mat(0, 0), angular_linear_1.clone().at_mat(0, 1), angular_linear_1.clone().at_mat(0, 2)],
-        [linear_angular_1.clone().at_mat(1, 0), linear_angular_1.clone().at_mat(1, 1), linear_angular_1.clone().at_mat(1, 2), angular_linear_1.clone().at_mat(1, 0), angular_linear_1.clone().at_mat(1, 1), angular_linear_1.clone().at_mat(1, 2)],
-        [linear_angular_1.clone().at_mat(2, 0), linear_angular_1.clone().at_mat(2, 1), linear_angular_1.clone().at_mat(2, 2), angular_linear_1.clone().at_mat(2, 0), angular_linear_1.clone().at_mat(2, 1), angular_linear_1.clone().at_mat(2, 2)],
-        [angular_linear_1.clone().at_mat(0, 0), angular_linear_1.clone().at_mat(0, 1), angular_linear_1.clone().at_mat(0, 2), angular_angular_1.clone().at_mat(0, 0), angular_angular_1.clone().at_mat(0, 1), angular_angular_1.clone().at_mat(0, 2)],
-        [angular_linear_1.clone().at_mat(1, 0), angular_linear_1.clone().at_mat(1, 1), angular_linear_1.clone().at_mat(1, 2), angular_angular_1.clone().at_mat(1, 0), angular_angular_1.clone().at_mat(1, 1), angular_angular_1.clone().at_mat(1, 2)],
-        [angular_linear_1.clone().at_mat(2, 0), angular_linear_1.clone().at_mat(2, 1), angular_linear_1.clone().at_mat(2, 2), angular_angular_1.clone().at_mat(2, 0), angular_angular_1.clone().at_mat(2, 1), angular_angular_1.clone().at_mat(2, 2)]
-    ).define("add_force_cross_res");
+    Matrix!(
+        [mout.clone().at_mat(0, 0), mout.clone().at_mat(0, 1), mout.clone().at_mat(0, 2), res_linear_angular.clone().at_mat(0, 0), res_linear_angular.clone().at_mat(0, 1), res_linear_angular.clone().at_mat(0, 2)],
+        [mout.clone().at_mat(1, 0), mout.clone().at_mat(1, 1), mout.clone().at_mat(1, 2), res_linear_angular.clone().at_mat(1, 0), res_linear_angular.clone().at_mat(1, 1), res_linear_angular.clone().at_mat(1, 2)],
+        [mout.clone().at_mat(2, 0), mout.clone().at_mat(2, 1), mout.clone().at_mat(2, 2), res_linear_angular.clone().at_mat(2, 0), res_linear_angular.clone().at_mat(2, 1), res_linear_angular.clone().at_mat(2, 2)],
+        [res_angular_linear.clone().at_mat(0, 0), res_angular_linear.clone().at_mat(0, 1), res_angular_linear.clone().at_mat(0, 2), res_angular_angular.clone().at_mat(0, 0), res_angular_angular.clone().at_mat(0, 1), res_angular_angular.clone().at_mat(0, 2)],
+        [res_angular_linear.clone().at_mat(1, 0), res_angular_linear.clone().at_mat(1, 1), res_angular_linear.clone().at_mat(1, 2), res_angular_angular.clone().at_mat(1, 0), res_angular_angular.clone().at_mat(1, 1), res_angular_angular.clone().at_mat(1, 2)],
+        [res_angular_linear.clone().at_mat(2, 0), res_angular_linear.clone().at_mat(2, 1), res_angular_linear.clone().at_mat(2, 2), res_angular_angular.clone().at_mat(2, 0), res_angular_angular.clone().at_mat(2, 1), res_angular_angular.clone().at_mat(2, 2)]
+    ).define("add_force_cross_matrix")
+    
 
-    res
+    
 }
 
 
@@ -887,15 +895,15 @@ fn first_pass(
     let data_of_linear = (data_of_linear_temp3.clone() + data_of_linear_temp4.clone()).define(format!("data_of_linear_{}", joint_id).as_str());
     let data_of_angular = (data_of_angular_temp3.clone() + data_of_angular_temp6.clone()).define(format!("data_of_angular_{}", joint_id).as_str());
 
-    // correct until here
-
+    
     // J_cols = data.oMi[i].act(jdata.S());
     // S is ConstraintRevoluteTpl, and this function can be found in:
     // include/pinocchio/multibody/joint/joint-revolute.hpp, ConstraintRevoluteTpl::se3Action
     let (J_cols_linear, J_cols_angular) = act_constraint(&oMis[joint_id].0, &oMis[joint_id].1);
-
+    
     //motionSet::motionAction(ov,J_cols,dJ_cols);
     let (dJ_cols_linear, dJ_cols_angular) = motionAction(&ov_linear, &ov_angular, &J_cols_linear, &J_cols_angular, joint_id);
+    
     
     // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
     let oa_gf_parent_linear = Vector!(
@@ -908,14 +916,14 @@ fn first_pass(
         oa_gfs[joint_id].clone().at_vec(4),
         oa_gfs[joint_id].clone().at_vec(5)
     ).define(format!("oa_gf_parent_angular_{}", joint_id).as_str());
-
+    
     //motionSet::motionAction(data.oa_gf[parent],J_cols,dAdq_cols);
     let (mut dAdq_cols_linear, mut dAdq_cols_angular) = motionAction(&oa_gf_parent_linear, &oa_gf_parent_angular, &J_cols_linear, &J_cols_angular, joint_id);
-
+    
     // dAdv_cols = dJ_cols;
     let mut dAdv_cols_linear = dJ_cols_linear.clone().define(format!("dAdv_cols_linear_{}", joint_id).as_str());
     let mut dAdv_cols_angular = dJ_cols_angular.clone().define(format!("dAdv_cols_angular_{}", joint_id).as_str());
-
+    
     //if(parent > 0)
     //  {
     //    motionSet::motionAction(data.ov[parent],J_cols,dVdq_cols);
@@ -974,9 +982,10 @@ fn first_pass(
     //data.doYcrb[i] = data.oYcrb[i].variation(ov);
     //
     //addForceCrossMatrix(data.oh[i],data.doYcrb[i]);
-
+    
     let data_doycrb_i = inertia_variation(&data_oycrb_rot_i.clone(), &data_oycrb_trans_i.clone(), &ov_linear, &ov_angular, &masses.clone().at_vec(joint_id));
-
+    
+    // correct until here
     let data_doycrb_i = add_force_cross_matrix(&data_oh_linear.clone(), &data_oh_angular.clone(), &data_doycrb_i.clone());
 
     limi_rotations
