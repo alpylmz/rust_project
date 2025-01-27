@@ -1,6 +1,7 @@
 #include <math.h>
 #include <iostream>
 #include <vector>
+#include <chrono>
 
 /* @pre: ((cos_qpos_0 > -1.0) && (cos_qpos_0 < 1.0) && (cos_qpos_1 > -1.0) && (cos_qpos_1 < 1.0) && (cos_qpos_2 > -1.0) && (cos_qpos_2 < 1.0) && (cos_qpos_3 > -1.0) && (cos_qpos_3 < 1.0) && (cos_qpos_4 > -1.0) && (cos_qpos_4 < 1.0) && (cos_qpos_5 > -1.0) && (cos_qpos_5 < 1.0) && (sin_qpos_0 > -1.0) && (sin_qpos_0 < 1.0) && (sin_qpos_1 > -1.0) && (sin_qpos_1 < 1.0) && (sin_qpos_2 > -1.0) && (sin_qpos_2 < 1.0) && (sin_qpos_3 > -1.0) && (sin_qpos_3 < 1.0) && (sin_qpos_4 > -1.0) && (sin_qpos_4 < 1.0) && (sin_qpos_5 > -1.0) && (sin_qpos_5 < 1.0)) */
 /* @post: (res) => (res +/- 1.0e-05) */
@@ -1758,12 +1759,12 @@ double rnea(
 
 
 
-  std::cout << "data_tau_0: " << data_tau_0 << std::endl;
-  std::cout << "data_tau_1: " << data_tau_1 << std::endl;
-  std::cout << "data_tau_2: " << data_tau_2 << std::endl;
-  std::cout << "data_tau_3: " << data_tau_3 << std::endl;
-  std::cout << "data_tau_4: " << data_tau_4 << std::endl;
-  std::cout << "data_tau_5: " << data_tau_5 << std::endl;
+  //std::cout << "data_tau_0: " << data_tau_0 << std::endl;
+  //std::cout << "data_tau_1: " << data_tau_1 << std::endl;
+  //std::cout << "data_tau_2: " << data_tau_2 << std::endl;
+  //std::cout << "data_tau_3: " << data_tau_3 << std::endl;
+  //std::cout << "data_tau_4: " << data_tau_4 << std::endl;
+  //std::cout << "data_tau_5: " << data_tau_5 << std::endl;
 
 
 
@@ -1785,10 +1786,22 @@ int main(){
     std::vector<double> cos_qpos = {cos(q[0]), cos(q[1]), cos(q[2]), cos(q[3]), cos(q[4]), cos(q[5])};
     std::vector<double> sin_qpos = {sin(q[0]), sin(q[1]), sin(q[2]), sin(q[3]), sin(q[4]), sin(q[5])};
 
-    rnea(
-        cos_qpos[0], cos_qpos[1], cos_qpos[2], cos_qpos[3], cos_qpos[4], cos_qpos[5],
-        sin_qpos[0], sin_qpos[1], sin_qpos[2], sin_qpos[3], sin_qpos[4], sin_qpos[5],
-        v[0], v[1], v[2], v[3], v[4], v[5],
-        a[0], a[1], a[2], a[3], a[4], a[5]
-    );
+    int ITERATION_COUNT = 1e7;
+    // put a timer
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for(int i = 0; i < ITERATION_COUNT; i++){
+      cos_qpos[0] += 0.000001;
+
+      rnea(
+          cos_qpos[0], cos_qpos[1], cos_qpos[2], cos_qpos[3], cos_qpos[4], cos_qpos[5],
+          sin_qpos[0], sin_qpos[1], sin_qpos[2], sin_qpos[3], sin_qpos[4], sin_qpos[5],
+          v[0], v[1], v[2], v[3], v[4], v[5],
+          a[0], a[1], a[2], a[3], a[4], a[5]
+      );
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end-start;
+    std::cout << "Time: " << diff.count() << " s\n";
 }
