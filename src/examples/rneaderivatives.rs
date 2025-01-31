@@ -673,16 +673,23 @@ fn first_pass(
     data_v: &ASTNode, 
     v: &ASTNode, 
     a: &ASTNode,
-    all_v: &Vec<ASTNode>,
+    all_v: &mut Vec<ASTNode>,
     oMis: &mut Vec<(ASTNode, ASTNode)>, // the first is rotation, the second is translation
     limi_translations: &Vec<ASTNode>,
-    mut limi_rotations: Vec<ASTNode>,
+    limi_rotations: &mut Vec<ASTNode>,
     joint_id: usize,
     levers: &Vec<ASTNode>, // lever is from urdf: <origin rpy="0 0 0" xyz="0.003875 0.002081 -0.04762"/> xyz is lever
     masses: &ASTNode, // mass is from urdf: 
     inertias: &Vec<ASTNode>, // inertia is from urdf: <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
-    oa_gfs: &Vec<ASTNode>
-) -> Vec<ASTNode> {
+    oa_gfs: &Vec<ASTNode>,
+    all_of: &mut Vec<ASTNode>,
+    all_oh: &mut Vec<ASTNode>,
+    all_doycrb: &mut Vec<ASTNode>,
+    all_ov: &mut Vec<ASTNode>,
+    all_oa: &mut Vec<ASTNode>,
+    all_oa_gf: &mut Vec<ASTNode>,
+    all_a: &mut Vec<ASTNode>,
+) {
 
     let rotation_matrix = Matrix!(
         [qcos.clone(), -qsin.clone(), 0.0],
@@ -727,16 +734,21 @@ fn first_pass(
         parent_v.clone().at_vec(5)
     ).define(format!("parent_v_angular_{}", joint_id).as_str());
 
+    let parent_a = match joint_id {
+        0 => Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("parent_a"),
+        _ => all_a[joint_id - 1].clone()
+    };
+
     let parent_a_linear = Vector!(
-        parent_v.clone().at_vec(0),
-        parent_v.clone().at_vec(1),
-        parent_v.clone().at_vec(2)
+        parent_a.clone().at_vec(0),
+        parent_a.clone().at_vec(1),
+        parent_a.clone().at_vec(2)
     ).define(format!("parent_a_linear_{}", joint_id).as_str());
 
     let parent_a_angular = Vector!(
-        parent_v.clone().at_vec(3),
-        parent_v.clone().at_vec(4),
-        parent_v.clone().at_vec(5)
+        parent_a.clone().at_vec(3),
+        parent_a.clone().at_vec(4),
+        parent_a.clone().at_vec(5)
     ).define(format!("parent_a_angular_{}", joint_id).as_str());
 
 
@@ -749,7 +761,6 @@ fn first_pass(
     //    data.oMi[i] = data.liMi[i];
     match joint_id {
         0 => oMis.push((limi_rotation.clone(), limi_translation.clone())),
-        1 => oMis.push((limi_rotation.clone(), limi_translation.clone())),
         _ => {
             // the multiplication between oMi and liMi is defined as:
             //{ return SE3Tpl(rot*m2.rotation()
@@ -761,6 +772,17 @@ fn first_pass(
             (new_v_linear, new_v_angular) = act_motion_inv(&limi_translation, &limi_rotation, &new_v_linear, &new_v_angular, parent_v_linear, parent_v_angular, joint_id);
         }
     }
+    // as the calculation of data.v[i] is done here, we can push it to all_v
+    all_v.push(Vector!(
+        new_v_linear.clone().at_vec(0),
+        new_v_linear.clone().at_vec(1),
+        new_v_linear.clone().at_vec(2),
+        new_v_angular.clone().at_vec(0),
+        new_v_angular.clone().at_vec(1),
+        new_v_angular.clone().at_vec(2)
+    ).define(format!("all_v_{}", joint_id).as_str()));
+
+
     //oMis.push(oMis[joint_id - 1].clone() * limi_rotation.clone());
 
 
@@ -787,13 +809,15 @@ fn first_pass(
         a.clone().at_vec(joint_id)
     ).define(format!("new_data_a{}", joint_id).as_str());
 
+    all_a.push(new_data_a.clone());
+
     //if(parent > 0)
     //  {
     //    data.a[i] += data.liMi[i].actInv(data.a[parent]);
     //  }
 
     match joint_id {
-        0 | 1 => (),
+        0 => (),
         _ => {
             let limi_actInv_a_parent = act_motion_inv(&limi_translation, &limi_rotation, &alpha_cross_linear, &alpha_cross_angular, parent_a_linear, parent_a_angular, joint_id);
     
@@ -821,9 +845,18 @@ fn first_pass(
     // oa = data.oMi[i].act(data.a[i]);
     let oa = act_motion(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_data_a.clone(), joint_id).define(format!("oa_{}", joint_id).as_str());
 
+    // push ov
+    all_ov.push(ov.clone());
+    // push oa
+    all_oa.push(oa.clone());
+
     //oa_gf = oa - model.gravity; // add gravity contribution
     let model_gravity = Vector!(0.0, 0.0, -9.81, 0.0, 0.0, 0.0).define("model_gravity");
     let oa_gf = (oa.clone() - model_gravity.clone()).define(format!("oa_gf_{}", joint_id).as_str());
+
+    // push oa_gf
+    all_oa_gf.push(oa_gf.clone());
+
 
 
 
@@ -852,6 +885,16 @@ fn first_pass(
     let data_oh_angular_temp2 = data_oycrb_trans_i.clone().cross(data_oh_linear.clone()).define(format!("data_oh_angular_temp2_{}", joint_id).as_str());
     let data_oh_angular = (data_oh_angular_temp.clone() + data_oh_angular_temp2.clone()).define(format!("data_oh_angular_{}", joint_id).as_str());
     
+    // push to all_oh
+    all_oh.push(Vector!(
+        data_oh_linear.clone().at_vec(0),
+        data_oh_linear.clone().at_vec(1),
+        data_oh_linear.clone().at_vec(2),
+        data_oh_angular.clone().at_vec(0),
+        data_oh_angular.clone().at_vec(1),
+        data_oh_angular.clone().at_vec(2)
+    ).define(format!("all_oh_{}", joint_id).as_str()));
+
     //data.of[i] = data.oYcrb[i] * oa_gf + ov.cross(data.oh[i]);
     // cross is ov.cross(data.oh[i]), so v is ov, linear() is oh_linear and angular() is oh_angular
     // the cross here is not the regular cross product since the vectors are 6D
@@ -894,7 +937,15 @@ fn first_pass(
 
     let data_of_linear = (data_of_linear_temp3.clone() + data_of_linear_temp4.clone()).define(format!("data_of_linear_{}", joint_id).as_str());
     let data_of_angular = (data_of_angular_temp3.clone() + data_of_angular_temp6.clone()).define(format!("data_of_angular_{}", joint_id).as_str());
-
+    // push to all_of
+    all_of.push(Vector!(
+        data_of_linear.clone().at_vec(0),
+        data_of_linear.clone().at_vec(1),
+        data_of_linear.clone().at_vec(2),
+        data_of_angular.clone().at_vec(0),
+        data_of_angular.clone().at_vec(1),
+        data_of_angular.clone().at_vec(2)
+    ).define(format!("all_of_{}", joint_id).as_str()));
     
     // J_cols = data.oMi[i].act(jdata.S());
     // S is ConstraintRevoluteTpl, and this function can be found in:
@@ -906,17 +957,23 @@ fn first_pass(
     
     
     // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
-    let oa_gf_parent_linear = Vector!(
-        oa_gfs[joint_id].clone().at_vec(0),
-        oa_gfs[joint_id].clone().at_vec(1),
-        oa_gfs[joint_id].clone().at_vec(2)
-    ).define(format!("oa_gf_parent_linear_{}", joint_id).as_str());
-    let oa_gf_parent_angular = Vector!(
-        oa_gfs[joint_id].clone().at_vec(3),
-        oa_gfs[joint_id].clone().at_vec(4),
-        oa_gfs[joint_id].clone().at_vec(5)
-    ).define(format!("oa_gf_parent_angular_{}", joint_id).as_str());
-    
+    let oa_gf_parent_linear = match joint_id {
+        0 => Vector!(0.0, 0.0, 0.0).define(format!("oa_gf_parent_linear_{}", joint_id).as_str()),
+        _ => Vector!(
+            all_oa_gf[joint_id - 1].clone().at_vec(0),
+            all_oa_gf[joint_id - 1].clone().at_vec(1),
+            all_oa_gf[joint_id - 1].clone().at_vec(2)
+        ).define(format!("oa_gf_parent_linear_{}", joint_id).as_str())
+    };
+    let oa_gf_parent_angular = match joint_id {
+        0 => Vector!(0.0, 0.0, -9.81).define(format!("oa_gf_parent_angular_{}", joint_id).as_str()), // first oa_gf is gravity, it is hardcoded in pinocchio
+        _ => Vector!(
+            all_oa_gf[joint_id - 1].clone().at_vec(3),
+            all_oa_gf[joint_id - 1].clone().at_vec(4),
+            all_oa_gf[joint_id - 1].clone().at_vec(5)
+        ).define(format!("oa_gf_parent_angular_{}", joint_id).as_str())
+    };
+
     //motionSet::motionAction(data.oa_gf[parent],J_cols,dAdq_cols);
     let (mut dAdq_cols_linear, mut dAdq_cols_angular) = motionAction(&oa_gf_parent_linear, &oa_gf_parent_angular, &J_cols_linear, &J_cols_angular, joint_id);
     
@@ -936,18 +993,18 @@ fn first_pass(
     //  }
 
     let (dvdq_cols_linear, dvdq_cols_angular) = match joint_id {
-        0 | 1 => (Vector!(0.0, 0.0, 0.0).define(format!("dvdq_cols_linear_{}", joint_id).as_str()), Vector!(0.0, 0.0, 0.0).define(format!("dvdq_cols_angular_{}", joint_id).as_str())),
+        0 => (Vector!(0.0, 0.0, 0.0).define(format!("dvdq_cols_linear_{}", joint_id).as_str()), Vector!(0.0, 0.0, 0.0).define(format!("dvdq_cols_angular_{}", joint_id).as_str())),
         _ => {
             // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
             let data_ov_parent_linear = Vector!(
-                all_v[joint_id].clone().at_vec(0),
-                all_v[joint_id].clone().at_vec(1),
-                all_v[joint_id].clone().at_vec(2)
+                all_ov[joint_id - 1].clone().at_vec(0),
+                all_ov[joint_id - 1].clone().at_vec(1),
+                all_ov[joint_id - 1].clone().at_vec(2)
             ).define(format!("data_ov_parent_linear_{}", joint_id).as_str());
             let data_ov_parent_angular = Vector!(
-                all_v[joint_id].clone().at_vec(3),
-                all_v[joint_id].clone().at_vec(4),
-                all_v[joint_id].clone().at_vec(5)
+                all_ov[joint_id - 1].clone().at_vec(3),
+                all_ov[joint_id - 1].clone().at_vec(4),
+                all_ov[joint_id - 1].clone().at_vec(5)
             ).define(format!("data_ov_parent_angular_{}", joint_id).as_str());
             motionAction(&data_ov_parent_linear, &data_ov_parent_angular, &J_cols_linear, &J_cols_angular, joint_id)
         }
@@ -956,18 +1013,18 @@ fn first_pass(
     //    motionSet::motionAction<ADDTO>(data.ov[parent],dVdq_cols,dAdq_cols);
     //    dAdv_cols.noalias() += dVdq_cols;
     match joint_id {
-        0 | 1 => (),
+        0 => (),
         _ => {
             // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
             let data_ov_parent_linear = Vector!(
-                all_v[joint_id].clone().at_vec(0),
-                all_v[joint_id].clone().at_vec(1),
-                all_v[joint_id].clone().at_vec(2)
+                all_ov[joint_id - 1].clone().at_vec(0),
+                all_ov[joint_id - 1].clone().at_vec(1),
+                all_ov[joint_id - 1].clone().at_vec(2)
             ).define(format!("data_ov_parent_linear_{}", joint_id).as_str());
             let data_ov_parent_angular = Vector!(
-                all_v[joint_id].clone().at_vec(3),
-                all_v[joint_id].clone().at_vec(4),
-                all_v[joint_id].clone().at_vec(5)
+                all_ov[joint_id - 1].clone().at_vec(3),
+                all_ov[joint_id - 1].clone().at_vec(4),
+                all_ov[joint_id - 1].clone().at_vec(5)
             ).define(format!("data_ov_parent_angular_{}", joint_id).as_str());
             let (dAdq_add_linear, dAdq_add_angular) = motionAction(&data_ov_parent_linear, &data_ov_parent_angular, &dvdq_cols_linear, &dvdq_cols_angular, joint_id);
             dAdq_cols_linear = (dAdq_cols_linear.clone() + dAdq_add_linear.clone()).define(format!("dAdq_cols_linear_{}", joint_id).as_str());
@@ -985,10 +1042,10 @@ fn first_pass(
     
     let data_doycrb_i = inertia_variation(&data_oycrb_rot_i.clone(), &data_oycrb_trans_i.clone(), &ov_linear, &ov_angular, &masses.clone().at_vec(joint_id));
     
-    // correct until here
     let data_doycrb_i = add_force_cross_matrix(&data_oh_linear.clone(), &data_oh_angular.clone(), &data_doycrb_i.clone());
 
-    limi_rotations
+    all_doycrb.push(data_doycrb_i.clone());
+
     //(limi_rotations, new_v, new_a_gf_up3, h, f)
 }
 
@@ -1087,6 +1144,13 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     let mut all_a_gf: Vec<ASTNode> = vec![];
     let mut all_h: Vec<ASTNode> = vec![];
     let mut all_f: Vec<ASTNode> = vec![];
+    let mut all_of: Vec<ASTNode> = vec![];
+    let mut all_oh: Vec<ASTNode> = vec![];
+    let mut all_doycrb: Vec<ASTNode> = vec![];
+    let mut all_ov: Vec<ASTNode> = vec![];
+    let mut all_oa: Vec<ASTNode> = vec![];
+    let mut all_oa_gf: Vec<ASTNode> = vec![];
+    let mut all_a: Vec<ASTNode> = vec![];
 
     //data.oa_gf[0] = -model.gravity;
     let data_oa_gf = Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("parent_oa_gf");
@@ -1100,41 +1164,36 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     let mut oMis: Vec<(ASTNode, ASTNode)> = Vec::new();
     let mut oa_gfs: Vec<ASTNode> = Vec::new();
     oa_gfs.push(data_oa_gf.clone());
-    // rest of the oa_gfs are just 0
+    // rest of the oa_gfs are just 0, I don't know why
     for i in 0..n_joints {
         oa_gfs.push(Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define(format!("oa_gf_{}", i).as_str()));
     }
 
-    // all all_v's are 0, n_joints + 1 elements
-    for i in 0..(n_joints + 1) {
-        all_v.push(Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define(format!("all_v_{}", i).as_str()));
-    }
-
-
     // first pass, it takes model.joints[i], data.joints[i], model, data, q, v, a
     for i in 0..n_joints {
-        limi_rotations = first_pass(
+        first_pass(
             qsin.clone().at_vec(i), // qsin and qcos will not change, therefore no reference needed
             qcos.clone().at_vec(i),
             &data_v[i],
             &v,
             &a,
-            &all_v,
+            &mut all_v,
             &mut oMis,
             &limi_translations,
-            limi_rotations,
+            &mut limi_rotations,
             i,
             &levers,
             &masses,
             &inertias,
             &oa_gfs,
+            &mut all_of,
+            &mut all_oh,
+            &mut all_doycrb,
+            &mut all_ov,
+            &mut all_oa,
+            &mut all_oa_gf,
+            &mut all_a,
         );
-
-        all_v.push(new_v.clone());
-        all_a_gf.push(new_a_gf.clone());
-        all_h.push(new_h.clone());
-        all_f.push(new_f.clone());
-
     }
 
     // sec_pass will do its own iteration
