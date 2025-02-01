@@ -676,7 +676,6 @@ fn first_pass(
     levers: &Vec<ASTNode>, // lever is from urdf: <origin rpy="0 0 0" xyz="0.003875 0.002081 -0.04762"/> xyz is lever
     masses: &ASTNode, // mass is from urdf: 
     inertias: &Vec<ASTNode>, // inertia is from urdf: <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
-    oa_gfs: &Vec<ASTNode>,
     all_of: &mut Vec<ASTNode>,
     all_oh: &mut Vec<ASTNode>,
     all_doycrb: &mut Vec<ASTNode>,
@@ -1199,9 +1198,6 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     ];
 
     let mut all_v: Vec<ASTNode> = vec![];
-    let mut all_a_gf: Vec<ASTNode> = vec![];
-    let mut all_h: Vec<ASTNode> = vec![];
-    let mut all_f: Vec<ASTNode> = vec![];
     let mut all_of: Vec<ASTNode> = vec![];
     let mut all_oh: Vec<ASTNode> = vec![];
     let mut all_doycrb: Vec<ASTNode> = vec![];
@@ -1215,19 +1211,7 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     let mut dAdq_cols: Vec<ASTNode> = vec![];
     let mut dAdv_cols: Vec<ASTNode> = vec![];
     let mut dVdq_cols: Vec<ASTNode> = vec![];
-
-    //data.oa_gf[0] = -model.gravity;
-    let data_oa_gf = Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("parent_oa_gf");
-
-    // Check how to define these variables clearly
-    let mut new_v = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("new_v");
-    let mut new_a_gf = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("new_a_gf");
-    let mut new_h = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("new_h");
-    let mut new_f = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("new_f");
-
     let mut oMis: Vec<(ASTNode, ASTNode)> = Vec::new();
-    let mut oa_gfs: Vec<ASTNode> = Vec::new();
-    oa_gfs.push(data_oa_gf.clone());
 
     // first pass, it takes model.joints[i], data.joints[i], model, data, q, v, a
     for i in 0..n_joints {
@@ -1245,7 +1229,6 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
             &levers,
             &masses,
             &inertias,
-            &oa_gfs,
             &mut all_of,
             &mut all_oh,
             &mut all_doycrb,
@@ -1262,8 +1245,54 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
         );
     }
 
-    // merge j_cols to J
-    // merge dj_cols to dJ
+    // merge cols to matrices
+
+    let J = Matrix!(
+        [j_cols[0].clone().at_vec(0), j_cols[1].clone().at_vec(0), j_cols[2].clone().at_vec(0), j_cols[3].clone().at_vec(0), j_cols[4].clone().at_vec(0), j_cols[5].clone().at_vec(0)],
+        [j_cols[0].clone().at_vec(1), j_cols[1].clone().at_vec(1), j_cols[2].clone().at_vec(1), j_cols[3].clone().at_vec(1), j_cols[4].clone().at_vec(1), j_cols[5].clone().at_vec(1)],
+        [j_cols[0].clone().at_vec(2), j_cols[1].clone().at_vec(2), j_cols[2].clone().at_vec(2), j_cols[3].clone().at_vec(2), j_cols[4].clone().at_vec(2), j_cols[5].clone().at_vec(2)],
+        [j_cols[0].clone().at_vec(3), j_cols[1].clone().at_vec(3), j_cols[2].clone().at_vec(3), j_cols[3].clone().at_vec(3), j_cols[4].clone().at_vec(3), j_cols[5].clone().at_vec(3)],
+        [j_cols[0].clone().at_vec(4), j_cols[1].clone().at_vec(4), j_cols[2].clone().at_vec(4), j_cols[3].clone().at_vec(4), j_cols[4].clone().at_vec(4), j_cols[5].clone().at_vec(4)],
+        [j_cols[0].clone().at_vec(5), j_cols[1].clone().at_vec(5), j_cols[2].clone().at_vec(5), j_cols[3].clone().at_vec(5), j_cols[4].clone().at_vec(5), j_cols[5].clone().at_vec(5)]
+    ).define("J");
+
+    let dJ = Matrix!(
+        [dj_cols[0].clone().at_vec(0), dj_cols[1].clone().at_vec(0), dj_cols[2].clone().at_vec(0), dj_cols[3].clone().at_vec(0), dj_cols[4].clone().at_vec(0), dj_cols[5].clone().at_vec(0)],
+        [dj_cols[0].clone().at_vec(1), dj_cols[1].clone().at_vec(1), dj_cols[2].clone().at_vec(1), dj_cols[3].clone().at_vec(1), dj_cols[4].clone().at_vec(1), dj_cols[5].clone().at_vec(1)],
+        [dj_cols[0].clone().at_vec(2), dj_cols[1].clone().at_vec(2), dj_cols[2].clone().at_vec(2), dj_cols[3].clone().at_vec(2), dj_cols[4].clone().at_vec(2), dj_cols[5].clone().at_vec(2)],
+        [dj_cols[0].clone().at_vec(3), dj_cols[1].clone().at_vec(3), dj_cols[2].clone().at_vec(3), dj_cols[3].clone().at_vec(3), dj_cols[4].clone().at_vec(3), dj_cols[5].clone().at_vec(3)],
+        [dj_cols[0].clone().at_vec(4), dj_cols[1].clone().at_vec(4), dj_cols[2].clone().at_vec(4), dj_cols[3].clone().at_vec(4), dj_cols[4].clone().at_vec(4), dj_cols[5].clone().at_vec(4)],
+        [dj_cols[0].clone().at_vec(5), dj_cols[1].clone().at_vec(5), dj_cols[2].clone().at_vec(5), dj_cols[3].clone().at_vec(5), dj_cols[4].clone().at_vec(5), dj_cols[5].clone().at_vec(5)]
+    ).define("dJ");
+
+    let dVdq = Matrix!(
+        [dVdq_cols[0].clone().at_vec(0), dVdq_cols[1].clone().at_vec(0), dVdq_cols[2].clone().at_vec(0), dVdq_cols[3].clone().at_vec(0), dVdq_cols[4].clone().at_vec(0), dVdq_cols[5].clone().at_vec(0)],
+        [dVdq_cols[0].clone().at_vec(1), dVdq_cols[1].clone().at_vec(1), dVdq_cols[2].clone().at_vec(1), dVdq_cols[3].clone().at_vec(1), dVdq_cols[4].clone().at_vec(1), dVdq_cols[5].clone().at_vec(1)],
+        [dVdq_cols[0].clone().at_vec(2), dVdq_cols[1].clone().at_vec(2), dVdq_cols[2].clone().at_vec(2), dVdq_cols[3].clone().at_vec(2), dVdq_cols[4].clone().at_vec(2), dVdq_cols[5].clone().at_vec(2)],
+        [dVdq_cols[0].clone().at_vec(3), dVdq_cols[1].clone().at_vec(3), dVdq_cols[2].clone().at_vec(3), dVdq_cols[3].clone().at_vec(3), dVdq_cols[4].clone().at_vec(3), dVdq_cols[5].clone().at_vec(3)],
+        [dVdq_cols[0].clone().at_vec(4), dVdq_cols[1].clone().at_vec(4), dVdq_cols[2].clone().at_vec(4), dVdq_cols[3].clone().at_vec(4), dVdq_cols[4].clone().at_vec(4), dVdq_cols[5].clone().at_vec(4)],
+        [dVdq_cols[0].clone().at_vec(5), dVdq_cols[1].clone().at_vec(5), dVdq_cols[2].clone().at_vec(5), dVdq_cols[3].clone().at_vec(5), dVdq_cols[4].clone().at_vec(5), dVdq_cols[5].clone().at_vec(5)]
+    ).define("dVdq");
+
+    let dAdq = Matrix!(
+        [dAdq_cols[0].clone().at_vec(0), dAdq_cols[1].clone().at_vec(0), dAdq_cols[2].clone().at_vec(0), dAdq_cols[3].clone().at_vec(0), dAdq_cols[4].clone().at_vec(0), dAdq_cols[5].clone().at_vec(0)],
+        [dAdq_cols[0].clone().at_vec(1), dAdq_cols[1].clone().at_vec(1), dAdq_cols[2].clone().at_vec(1), dAdq_cols[3].clone().at_vec(1), dAdq_cols[4].clone().at_vec(1), dAdq_cols[5].clone().at_vec(1)],
+        [dAdq_cols[0].clone().at_vec(2), dAdq_cols[1].clone().at_vec(2), dAdq_cols[2].clone().at_vec(2), dAdq_cols[3].clone().at_vec(2), dAdq_cols[4].clone().at_vec(2), dAdq_cols[5].clone().at_vec(2)],
+        [dAdq_cols[0].clone().at_vec(3), dAdq_cols[1].clone().at_vec(3), dAdq_cols[2].clone().at_vec(3), dAdq_cols[3].clone().at_vec(3), dAdq_cols[4].clone().at_vec(3), dAdq_cols[5].clone().at_vec(3)],
+        [dAdq_cols[0].clone().at_vec(4), dAdq_cols[1].clone().at_vec(4), dAdq_cols[2].clone().at_vec(4), dAdq_cols[3].clone().at_vec(4), dAdq_cols[4].clone().at_vec(4), dAdq_cols[5].clone().at_vec(4)],
+        [dAdq_cols[0].clone().at_vec(5), dAdq_cols[1].clone().at_vec(5), dAdq_cols[2].clone().at_vec(5), dAdq_cols[3].clone().at_vec(5), dAdq_cols[4].clone().at_vec(5), dAdq_cols[5].clone().at_vec(5)]
+    ).define("dAdq");
+
+    let dAdv = Matrix!(
+        [dAdv_cols[0].clone().at_vec(0), dAdv_cols[1].clone().at_vec(0), dAdv_cols[2].clone().at_vec(0), dAdv_cols[3].clone().at_vec(0), dAdv_cols[4].clone().at_vec(0), dAdv_cols[5].clone().at_vec(0)],
+        [dAdv_cols[0].clone().at_vec(1), dAdv_cols[1].clone().at_vec(1), dAdv_cols[2].clone().at_vec(1), dAdv_cols[3].clone().at_vec(1), dAdv_cols[4].clone().at_vec(1), dAdv_cols[5].clone().at_vec(1)],
+        [dAdv_cols[0].clone().at_vec(2), dAdv_cols[1].clone().at_vec(2), dAdv_cols[2].clone().at_vec(2), dAdv_cols[3].clone().at_vec(2), dAdv_cols[4].clone().at_vec(2), dAdv_cols[5].clone().at_vec(2)],
+        [dAdv_cols[0].clone().at_vec(3), dAdv_cols[1].clone().at_vec(3), dAdv_cols[2].clone().at_vec(3), dAdv_cols[3].clone().at_vec(3), dAdv_cols[4].clone().at_vec(3), dAdv_cols[5].clone().at_vec(3)],
+        [dAdv_cols[0].clone().at_vec(4), dAdv_cols[1].clone().at_vec(4), dAdv_cols[2].clone().at_vec(4), dAdv_cols[3].clone().at_vec(4), dAdv_cols[4].clone().at_vec(4), dAdv_cols[5].clone().at_vec(4)],
+        [dAdv_cols[0].clone().at_vec(5), dAdv_cols[1].clone().at_vec(5), dAdv_cols[2].clone().at_vec(5), dAdv_cols[3].clone().at_vec(5), dAdv_cols[4].clone().at_vec(5), dAdv_cols[5].clone().at_vec(5)]
+    ).define("dAdv");
+
+
 
 
 
