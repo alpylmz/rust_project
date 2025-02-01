@@ -19,21 +19,21 @@ fn validate_vector(node: &ASTNode, name: &str) {
 fn calc_limi(rotation_matrix: ASTNode, joint_id: usize) -> ASTNode {
     if joint_id == 0 {
         Matrix!(
-            [rotation_matrix.clone().at_mat(0, 0), rotation_matrix.clone().at_mat(0, 1), 0.0],
-            [rotation_matrix.clone().at_mat(1, 0), rotation_matrix.clone().at_mat(1, 1), 0.0],
+            [rotation_matrix.at_mat(0, 0), rotation_matrix.at_mat(0, 1), 0.0],
+            [rotation_matrix.at_mat(1, 0), rotation_matrix.at_mat(1, 1), 0.0],
             [0.0, 0.0, 1.0]
         ).define(format!("limi_rotation_{}", joint_id).as_str())
     } else if joint_id == 1 || joint_id == 4 {
         Matrix!(
-            [rotation_matrix.clone().at_mat(0, 0), rotation_matrix.clone().at_mat(0, 1), 0.0],
+            [rotation_matrix.at_mat(0, 0), rotation_matrix.at_mat(0, 1), 0.0],
             [0.0, 0.0, 1.0],
-            [-rotation_matrix.clone().at_mat(1, 0), -rotation_matrix.clone().at_mat(1, 1), 0.0]
+            [-rotation_matrix.at_mat(1, 0), -rotation_matrix.at_mat(1, 1), 0.0]
         ).define(format!("limi_rotation_{}", joint_id).as_str())
     } else {
         Matrix!(
-            [rotation_matrix.clone().at_mat(0, 0), rotation_matrix.clone().at_mat(0, 1), 0.0],
+            [rotation_matrix.at_mat(0, 0), rotation_matrix.at_mat(0, 1), 0.0],
             [0.0, 0.0, -1.0],
-            [rotation_matrix.clone().at_mat(1, 0), rotation_matrix.clone().at_mat(1, 1), 0.0]
+            [rotation_matrix.at_mat(1, 0), rotation_matrix.at_mat(1, 1), 0.0]
         ).define(format!("limi_rotation_{}", joint_id).as_str())
     }
 }
@@ -41,9 +41,9 @@ fn calc_limi(rotation_matrix: ASTNode, joint_id: usize) -> ASTNode {
 
 // Linear and angular are the same, there should be a better way to write it
 //vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-fn alpha_cross_linear(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
-    let alpha_cross1 = (-(s.clone()) * vin.clone().at_vec(1)).define(format!("alpha_cross1_linear_{}", joint_id).as_str());
-    let alpha_cross2 = (s * vin.clone().at_vec(0)).define(format!("alpha_cross2_linear_{}", joint_id).as_str());
+fn alpha_cross_linear(s: &ASTNode, vin: &ASTNode, joint_id: usize) -> ASTNode {
+    let alpha_cross1 = (-(s.clone()) * vin.at_vec(1)).define(format!("alpha_cross1_linear_{}", joint_id).as_str());
+    let alpha_cross2 = (s * vin.at_vec(0)).define(format!("alpha_cross2_linear_{}", joint_id).as_str());
     let alpha_cross = Vector!(
         alpha_cross1,
         alpha_cross2,
@@ -54,9 +54,9 @@ fn alpha_cross_linear(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
 }
 
 //vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-fn alpha_cross_angular(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
-    let alpha_cross1 = (-(s.clone()) * vin.clone().at_vec(1)).define(format!("alpha_cross1_angular_{}", joint_id).as_str());
-    let alpha_cross2 = (s * vin.clone().at_vec(0)).define(format!("alpha_cross2_angular_{}", joint_id).as_str());
+fn alpha_cross_angular(s: &ASTNode, vin: &ASTNode, joint_id: usize) -> ASTNode {
+    let alpha_cross1 = (-(s.clone()) * vin.at_vec(1)).define(format!("alpha_cross1_angular_{}", joint_id).as_str());
+    let alpha_cross2 = (s * vin.at_vec(0)).define(format!("alpha_cross2_angular_{}", joint_id).as_str());
     let alpha_cross = Vector!(
         alpha_cross1,
         alpha_cross2,
@@ -72,17 +72,17 @@ fn alpha_cross_angular(s: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
 // vout_[1] = S3.m_data(1) * vin[0] + S3.m_data(2) * vin[1] + S3.m_data(4) * vin[2];
 // vout_[2] = S3.m_data(3) * vin[0] + S3.m_data(4) * vin[1] + S3.m_data(5) * vin[2];
 fn rhs_mult(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
-    let vout_0_0 = (inertia.clone().at_mat(0, 0) * vin.clone().at_vec(0)).define("");
-    let vout_0_1 = (inertia.clone().at_mat(0, 1) * vin.clone().at_vec(1)).define("");
-    let vout_0_2 = (inertia.clone().at_mat(0, 2) * vin.clone().at_vec(2)).define("");
+    let vout_0_0 = (inertia.at_mat(0, 0) * vin.at_vec(0)).define("");
+    let vout_0_1 = (inertia.at_mat(0, 1) * vin.at_vec(1)).define("");
+    let vout_0_2 = (inertia.at_mat(0, 2) * vin.at_vec(2)).define("");
 
-    let vout_1_0 = (inertia.clone().at_mat(0, 1) * vin.clone().at_vec(0)).define("");
-    let vout_1_1 = (inertia.clone().at_mat(1, 1) * vin.clone().at_vec(1)).define("");
-    let vout_1_2 = (inertia.clone().at_mat(1, 2) * vin.clone().at_vec(2)).define("");
+    let vout_1_0 = (inertia.at_mat(0, 1) * vin.at_vec(0)).define("");
+    let vout_1_1 = (inertia.at_mat(1, 1) * vin.at_vec(1)).define("");
+    let vout_1_2 = (inertia.at_mat(1, 2) * vin.at_vec(2)).define("");
 
-    let vout_2_0 = (inertia.clone().at_mat(0, 2) * vin.clone().at_vec(0)).define("");
-    let vout_2_1 = (inertia.clone().at_mat(1, 2) * vin.clone().at_vec(1)).define("");
-    let vout_2_2 = (inertia.clone().at_mat(2, 2) * vin.clone().at_vec(2)).define("");
+    let vout_2_0 = (inertia.at_mat(0, 2) * vin.at_vec(0)).define("");
+    let vout_2_1 = (inertia.at_mat(1, 2) * vin.at_vec(1)).define("");
+    let vout_2_2 = (inertia.at_mat(2, 2) * vin.at_vec(2)).define("");
 
     let rhs_mult1_temp = (vout_0_0 + vout_0_1).define(format!("rhsMult1_temp_{}", joint_id).as_str());
     let rhs_mult1 = (rhs_mult1_temp + vout_0_2).define(format!("rhsMult1_{}", joint_id).as_str());
@@ -109,9 +109,9 @@ fn rhs_mult(inertia: ASTNode, vin: ASTNode, joint_id: usize) -> ASTNode {
 
 fn skew_vec3d(vec: &ASTNode) -> ASTNode {
     let res = Matrix!(
-        [Scalar!(0.0), -(vec.clone().at_vec(2)), vec.clone().at_vec(1)],
-        [vec.clone().at_vec(2), Scalar!(0.0), -(vec.clone().at_vec(0))],
-        [-(vec.clone().at_vec(1)), vec.clone().at_vec(0), Scalar!(0.0)]
+        [Scalar!(0.0), -(vec.at_vec(2)), vec.at_vec(1)],
+        [vec.at_vec(2), Scalar!(0.0), -(vec.at_vec(0))],
+        [-(vec.at_vec(1)), vec.at_vec(0), Scalar!(0.0)]
     ).define("skew_vec3d");
 
     res
@@ -129,20 +129,20 @@ fn skew_square(u: &ASTNode, v: &ASTNode) -> ASTNode{
     // u and v should be vectors, so I need to either translate them into matrices
     // or I need to implement it manually
     let c1 = Matrix!(
-        [v.clone().at_vec(0) * u.clone().at_vec(0), v.clone().at_vec(0) * u.clone().at_vec(1), v.clone().at_vec(0) * u.clone().at_vec(2)],
-        [v.clone().at_vec(1) * u.clone().at_vec(0), v.clone().at_vec(1) * u.clone().at_vec(1), v.clone().at_vec(1) * u.clone().at_vec(2)],
-        [v.clone().at_vec(2) * u.clone().at_vec(0), v.clone().at_vec(2) * u.clone().at_vec(1), v.clone().at_vec(2) * u.clone().at_vec(2)] 
+        [v.at_vec(0) * u.at_vec(0), v.at_vec(0) * u.at_vec(1), v.at_vec(0) * u.at_vec(2)],
+        [v.at_vec(1) * u.at_vec(0), v.at_vec(1) * u.at_vec(1), v.at_vec(1) * u.at_vec(2)],
+        [v.at_vec(2) * u.at_vec(0), v.at_vec(2) * u.at_vec(1), v.at_vec(2) * u.at_vec(2)] 
     ).define("skew_square_c1");
 
     // then I need to calculate the dot product of u and v
     // I guess there is no dot product, so its manual
-    let udotv = (u.clone().at_vec(0) * v.clone().at_vec(0) + u.clone().at_vec(1) * v.clone().at_vec(1) + u.clone().at_vec(2) * v.clone().at_vec(2)).define("skew_square_udotv");
+    let udotv = (u.at_vec(0) * v.at_vec(0) + u.at_vec(1) * v.at_vec(1) + u.at_vec(2) * v.at_vec(2)).define("skew_square_udotv");
 
     // then I need to subtract the diagonal of c1 by udotv
     let c2 = Matrix!(
-        [c1.clone().at_mat(0, 0) - udotv.clone(), c1.clone().at_mat(0, 1), c1.clone().at_mat(0, 2)],
-        [c1.clone().at_mat(1, 0), c1.clone().at_mat(1, 1) - udotv.clone(), c1.clone().at_mat(1, 2)],
-        [c1.clone().at_mat(2, 0), c1.clone().at_mat(2, 1), c1.clone().at_mat(2, 2) - udotv.clone()]
+        [c1.at_mat(0, 0) - udotv.clone(), c1.at_mat(0, 1), c1.at_mat(0, 2)],
+        [c1.at_mat(1, 0), c1.at_mat(1, 1) - udotv.clone(), c1.at_mat(1, 2)],
+        [c1.at_mat(2, 0), c1.at_mat(2, 1), c1.at_mat(2, 2) - udotv.clone()]
     ).define("skew_square_c2");
 
     c2
@@ -157,9 +157,9 @@ fn skew_square(u: &ASTNode, v: &ASTNode) -> ASTNode{
 //                         m* x*z,m* y*z,-m*(x*x+y*y));
 // }
 fn alpha_skew_square(m: &ASTNode, v: &ASTNode) -> ASTNode {
-    let x = v.clone().at_vec(0);
-    let y = v.clone().at_vec(1);
-    let z = v.clone().at_vec(2);
+    let x = v.at_vec(0);
+    let y = v.at_vec(1);
+    let z = v.at_vec(2);
 
     let alpha_skew_square = Matrix!(
         [-m.clone() * (y.clone() * y.clone() + z.clone() * z.clone()), m.clone() * x.clone() * y.clone(), m.clone() * x.clone() * z.clone()],
@@ -195,14 +195,14 @@ fn alpha_skew_square(m: &ASTNode, v: &ASTNode) -> ASTNode {
 // rotation is inertia(), and translation is lever()
 fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode, angular: &ASTNode, mass: &ASTNode, joint_id: usize) -> ASTNode {
     let mv_linear = Vector!(
-        linear.clone().at_vec(0) * mass.clone(),
-        linear.clone().at_vec(1) * mass.clone(),
-        linear.clone().at_vec(2) * mass.clone()
+        linear.at_vec(0) * mass.clone(),
+        linear.at_vec(1) * mass.clone(),
+        linear.at_vec(2) * mass.clone()
     ).define("mv_linear");
     let mv_angular = Vector!(
-        angular.clone().at_vec(0) * mass.clone(),
-        angular.clone().at_vec(1) * mass.clone(),
-        angular.clone().at_vec(2) * mass.clone()
+        angular.at_vec(0) * mass.clone(),
+        angular.at_vec(1) * mass.clone(),
+        angular.at_vec(2) * mass.clone()
     ).define("mv_angular");
 
     // res.template block<3,3>(LINEAR,ANGULAR) = -skew(mv.linear()) - skewSquare(mv.angular(),lever()) + skewSquare(lever(),mv.angular());
@@ -219,9 +219,9 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
     let skew_second_first = skew_square(&mv_linear, translation);
     let skew_second_second = skew_square(translation, &mv_linear);
     let skew_second_first_neg = Matrix!(
-        [-skew_second_first.clone().at_mat(0, 0), -skew_second_first.clone().at_mat(0, 1), -skew_second_first.clone().at_mat(0, 2)],
-        [-skew_second_first.clone().at_mat(1, 0), -skew_second_first.clone().at_mat(1, 1), -skew_second_first.clone().at_mat(1, 2)],
-        [-skew_second_first.clone().at_mat(2, 0), -skew_second_first.clone().at_mat(2, 1), -skew_second_first.clone().at_mat(2, 2)]
+        [-skew_second_first.at_mat(0, 0), -skew_second_first.at_mat(0, 1), -skew_second_first.at_mat(0, 2)],
+        [-skew_second_first.at_mat(1, 0), -skew_second_first.at_mat(1, 1), -skew_second_first.at_mat(1, 2)],
+        [-skew_second_first.at_mat(2, 0), -skew_second_first.at_mat(2, 1), -skew_second_first.at_mat(2, 2)]
     ).define("skew_second_second_neg");
     let res_second = (skew_second_first_neg - skew_second_second).define("res_second");
 
@@ -229,35 +229,35 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
     let res_third = (rotation.clone() - alpha_skew_square(mass, translation)).define("res_third");
 
     // res.template block<3,3>(ANGULAR,ANGULAR) -= res.template block<3,3>(LINEAR,LINEAR) * skew(v.angular());
-    let res_fourth = (res_third.clone().cross(skew_vec3d(angular))).define("res_fourth");
+    let res_fourth = (res_third.clone().cross(&skew_vec3d(&angular))).define("res_fourth");
 
     let res_fifth = (res_second - res_fourth).define("res_fifth");
 
     // res.template block<3,3>(ANGULAR,ANGULAR) += cross(v.angular(),res.template block<3,3>(LINEAR,LINEAR));
     // cross here applies the cross product onto the columns of M.
     let res_third_first_col = Vector!(
-        res_third.clone().at_mat(0, 0),
-        res_third.clone().at_mat(1, 0),
-        res_third.clone().at_mat(2, 0)
+        res_third.at_mat(0, 0),
+        res_third.at_mat(1, 0),
+        res_third.at_mat(2, 0)
     ).define("res_third_first_col");
     let res_third_second_col = Vector!(
-        res_third.clone().at_mat(0, 1),
-        res_third.clone().at_mat(1, 1),
-        res_third.clone().at_mat(2, 1)
+        res_third.at_mat(0, 1),
+        res_third.at_mat(1, 1),
+        res_third.at_mat(2, 1)
     ).define("res_third_second_col");
     let res_third_third_col = Vector!(
-        res_third.clone().at_mat(0, 2),
-        res_third.clone().at_mat(1, 2),
-        res_third.clone().at_mat(2, 2)
+        res_third.at_mat(0, 2),
+        res_third.at_mat(1, 2),
+        res_third.at_mat(2, 2)
     ).define("res_third_third_col");
-    let res_sixth_first_col  = (angular.clone().cross(res_third_first_col)).define("res_sixth_first_col");
-    let res_sixth_second_col = (angular.clone().cross(res_third_second_col)).define("res_sixth_second_col");
-    let res_sixth_third_col  = (angular.clone().cross(res_third_third_col)).define("res_sixth_third_col");
+    let res_sixth_first_col  = (angular.cross(&res_third_first_col)).define("res_sixth_first_col");
+    let res_sixth_second_col = (angular.cross(&res_third_second_col)).define("res_sixth_second_col");
+    let res_sixth_third_col  = (angular.cross(&res_third_third_col)).define("res_sixth_third_col");
 
     let res_sixth = Matrix!(
-        [res_fifth.clone().at_mat(0,0) + res_sixth_first_col.clone().at_vec(0), res_fifth.clone().at_mat(0,1) + res_sixth_second_col.clone().at_vec(0), res_fifth.clone().at_mat(0,2) + res_sixth_third_col.clone().at_vec(0)],
-        [res_fifth.clone().at_mat(1,0) + res_sixth_first_col.clone().at_vec(1), res_fifth.clone().at_mat(1,1) + res_sixth_second_col.clone().at_vec(1), res_fifth.clone().at_mat(1,2) + res_sixth_third_col.clone().at_vec(1)],
-        [res_fifth.clone().at_mat(2,0) + res_sixth_first_col.clone().at_vec(2), res_fifth.clone().at_mat(2,1) + res_sixth_second_col.clone().at_vec(2), res_fifth.clone().at_mat(2,2) + res_sixth_third_col.clone().at_vec(2)]
+        [res_fifth.at_mat(0,0) + res_sixth_first_col.at_vec(0), res_fifth.at_mat(0,1) + res_sixth_second_col.at_vec(0), res_fifth.at_mat(0,2) + res_sixth_third_col.at_vec(0)],
+        [res_fifth.at_mat(1,0) + res_sixth_first_col.at_vec(1), res_fifth.at_mat(1,1) + res_sixth_second_col.at_vec(1), res_fifth.at_mat(1,2) + res_sixth_third_col.at_vec(1)],
+        [res_fifth.at_mat(2,0) + res_sixth_first_col.at_vec(2), res_fifth.at_mat(2,1) + res_sixth_second_col.at_vec(2), res_fifth.at_mat(2,2) + res_sixth_third_col.at_vec(2)]
     ).define("res_sixth");
 
     // linear parts are 0
@@ -266,12 +266,12 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
     // the first and second parts are the same, res_first
     
     let res_inertia_variation = Matrix!(
-        [Scalar!(0.0), Scalar!(0.0), Scalar!(0.0), res_first.clone().at_mat(0, 0), res_first.clone().at_mat(0, 1), res_first.clone().at_mat(0, 2)],
-        [Scalar!(0.0), Scalar!(0.0), Scalar!(0.0), res_first.clone().at_mat(1, 0), res_first.clone().at_mat(1, 1), res_first.clone().at_mat(1, 2)],
-        [Scalar!(0.0), Scalar!(0.0), Scalar!(0.0), res_first.clone().at_mat(2, 0), res_first.clone().at_mat(2, 1), res_first.clone().at_mat(2, 2)],
-        [res_first.clone().at_mat(0, 0), res_first.clone().at_mat(1, 0), res_first.clone().at_mat(2, 0), res_sixth.clone().at_mat(0, 0), res_sixth.clone().at_mat(0, 1), res_sixth.clone().at_mat(0, 2)],
-        [res_first.clone().at_mat(0, 1), res_first.clone().at_mat(1, 1), res_first.clone().at_mat(2, 1), res_sixth.clone().at_mat(1, 0), res_sixth.clone().at_mat(1, 1), res_sixth.clone().at_mat(1, 2)],
-        [res_first.clone().at_mat(0, 2), res_first.clone().at_mat(1, 2), res_first.clone().at_mat(2, 2), res_sixth.clone().at_mat(2, 0), res_sixth.clone().at_mat(2, 1), res_sixth.clone().at_mat(2, 2)]
+        [Scalar!(0.0), Scalar!(0.0), Scalar!(0.0), res_first.at_mat(0, 0), res_first.at_mat(0, 1), res_first.at_mat(0, 2)],
+        [Scalar!(0.0), Scalar!(0.0), Scalar!(0.0), res_first.at_mat(1, 0), res_first.at_mat(1, 1), res_first.at_mat(1, 2)],
+        [Scalar!(0.0), Scalar!(0.0), Scalar!(0.0), res_first.at_mat(2, 0), res_first.at_mat(2, 1), res_first.at_mat(2, 2)],
+        [res_first.at_mat(0, 0), res_first.at_mat(1, 0), res_first.at_mat(2, 0), res_sixth.at_mat(0, 0), res_sixth.at_mat(0, 1), res_sixth.at_mat(0, 2)],
+        [res_first.at_mat(0, 1), res_first.at_mat(1, 1), res_first.at_mat(2, 1), res_sixth.at_mat(1, 0), res_sixth.at_mat(1, 1), res_sixth.at_mat(1, 2)],
+        [res_first.at_mat(0, 2), res_first.at_mat(1, 2), res_first.at_mat(2, 2), res_sixth.at_mat(2, 0), res_sixth.at_mat(2, 1), res_sixth.at_mat(2, 2)]
     ).define(format!("inertia_variation_{}", joint_id).as_str());
 
     res_inertia_variation
@@ -286,10 +286,10 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
 //    mout.angular() = v.angular().cross(angular());
 //}
 fn motionAction(v_linear: &ASTNode, v_angular: &ASTNode, linear: &ASTNode, angular: &ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
-    let mout_linear_cross_angular = (v_linear.clone().cross(angular.clone())).define(format!("mout_linear_cross_angular_{}", joint_id).as_str());
-    let mout_angular_cross_linear = (v_angular.clone().cross(linear.clone())).define(format!("mout_angular_cross_linear_{}", joint_id).as_str());
+    let mout_linear_cross_angular = (v_linear.clone().cross(angular)).define(format!("mout_linear_cross_angular_{}", joint_id).as_str());
+    let mout_angular_cross_linear = (v_angular.clone().cross(linear)).define(format!("mout_angular_cross_linear_{}", joint_id).as_str());
     let mout_linear = (mout_linear_cross_angular + mout_angular_cross_linear).define(format!("mout_linear_{}", joint_id).as_str());
-    let mout_angular = (v_angular.clone().cross(angular.clone())).define(format!("mout_angular_{}", joint_id).as_str());
+    let mout_angular = (v_angular.clone().cross(&angular)).define(format!("mout_angular_{}", joint_id).as_str());
 
     (mout_linear, mout_angular)
 }
@@ -318,9 +318,9 @@ fn motionAction(v_linear: &ASTNode, v_angular: &ASTNode, linear: &ASTNode, angul
 //  }
 fn add_skew(m: &ASTNode, v: &ASTNode) -> ASTNode {
     Matrix!(
-        [m.clone().at_mat(0, 0), m.clone().at_mat(0, 1) - v.clone().at_vec(2), m.clone().at_mat(0, 2) + v.clone().at_vec(1)],
-        [m.clone().at_mat(1, 0) + v.clone().at_vec(2), m.clone().at_mat(1, 1), m.clone().at_mat(1, 2) - v.clone().at_vec(0)],
-        [m.clone().at_mat(2, 0) - v.clone().at_vec(1), m.clone().at_mat(2, 1) + v.clone().at_vec(0), m.clone().at_mat(2, 2)]
+        [m.at_mat(0, 0), m.at_mat(0, 1) - v.at_vec(2), m.at_mat(0, 2) + v.at_vec(1)],
+        [m.at_mat(1, 0) + v.at_vec(2), m.at_mat(1, 1), m.at_mat(1, 2) - v.at_vec(0)],
+        [m.at_mat(2, 0) - v.at_vec(1), m.at_mat(2, 1) + v.at_vec(0), m.at_mat(2, 2)]
     ).define("add_skew")
 }
 
@@ -336,30 +336,30 @@ fn add_skew(m: &ASTNode, v: &ASTNode) -> ASTNode {
 fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNode, joint_id: usize) -> ASTNode {
     // the linear linear part will stay the same
     let linear_angular = Matrix!(
-        [mout.clone().at_mat(0, 3), mout.clone().at_mat(0, 4), mout.clone().at_mat(0, 5)],
-        [mout.clone().at_mat(1, 3), mout.clone().at_mat(1, 4), mout.clone().at_mat(1, 5)],
-        [mout.clone().at_mat(2, 3), mout.clone().at_mat(2, 4), mout.clone().at_mat(2, 5)]
+        [mout.at_mat(0, 3), mout.at_mat(0, 4), mout.at_mat(0, 5)],
+        [mout.at_mat(1, 3), mout.at_mat(1, 4), mout.at_mat(1, 5)],
+        [mout.at_mat(2, 3), mout.at_mat(2, 4), mout.at_mat(2, 5)]
     ).define("add_force_cross_linear_angular");
     let angular_linear = Matrix!(
-        [mout.clone().at_mat(3, 0), mout.clone().at_mat(3, 1), mout.clone().at_mat(3, 2)],
-        [mout.clone().at_mat(4, 0), mout.clone().at_mat(4, 1), mout.clone().at_mat(4, 2)],
-        [mout.clone().at_mat(5, 0), mout.clone().at_mat(5, 1), mout.clone().at_mat(5, 2)]
+        [mout.at_mat(3, 0), mout.at_mat(3, 1), mout.at_mat(3, 2)],
+        [mout.at_mat(4, 0), mout.at_mat(4, 1), mout.at_mat(4, 2)],
+        [mout.at_mat(5, 0), mout.at_mat(5, 1), mout.at_mat(5, 2)]
     ).define("add_force_cross_angular_linear");
     let angular_angular = Matrix!(
-        [mout.clone().at_mat(3, 3), mout.clone().at_mat(3, 4), mout.clone().at_mat(3, 5)],
-        [mout.clone().at_mat(4, 3), mout.clone().at_mat(4, 4), mout.clone().at_mat(4, 5)],
-        [mout.clone().at_mat(5, 3), mout.clone().at_mat(5, 4), mout.clone().at_mat(5, 5)]
+        [mout.at_mat(3, 3), mout.at_mat(3, 4), mout.at_mat(3, 5)],
+        [mout.at_mat(4, 3), mout.at_mat(4, 4), mout.at_mat(4, 5)],
+        [mout.at_mat(5, 3), mout.at_mat(5, 4), mout.at_mat(5, 5)]
     ).define("add_force_cross_angular_angular");
 
     let minus_f_linear = Vector!(
-        -f_linear.clone().at_vec(0),
-        -f_linear.clone().at_vec(1),
-        -f_linear.clone().at_vec(2)
+        -f_linear.at_vec(0),
+        -f_linear.at_vec(1),
+        -f_linear.at_vec(2)
     ).define("minus_f_linear");
     let minus_f_angular = Vector!(
-        -f_angular.clone().at_vec(0),
-        -f_angular.clone().at_vec(1),
-        -f_angular.clone().at_vec(2)
+        -f_angular.at_vec(0),
+        -f_angular.at_vec(1),
+        -f_angular.at_vec(2)
     ).define("minus_f_angular");
     // addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::LINEAR,ForceDerived::ANGULAR));
     let res_linear_angular = add_skew(&linear_angular, &minus_f_linear).define("res_linear_angular");
@@ -369,12 +369,12 @@ fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNod
     let res_angular_angular = add_skew(&angular_angular, &minus_f_angular).define("res_angular_angular");
 
     Matrix!(
-        [mout.clone().at_mat(0, 0), mout.clone().at_mat(0, 1), mout.clone().at_mat(0, 2), res_linear_angular.clone().at_mat(0, 0), res_linear_angular.clone().at_mat(0, 1), res_linear_angular.clone().at_mat(0, 2)],
-        [mout.clone().at_mat(1, 0), mout.clone().at_mat(1, 1), mout.clone().at_mat(1, 2), res_linear_angular.clone().at_mat(1, 0), res_linear_angular.clone().at_mat(1, 1), res_linear_angular.clone().at_mat(1, 2)],
-        [mout.clone().at_mat(2, 0), mout.clone().at_mat(2, 1), mout.clone().at_mat(2, 2), res_linear_angular.clone().at_mat(2, 0), res_linear_angular.clone().at_mat(2, 1), res_linear_angular.clone().at_mat(2, 2)],
-        [res_angular_linear.clone().at_mat(0, 0), res_angular_linear.clone().at_mat(0, 1), res_angular_linear.clone().at_mat(0, 2), res_angular_angular.clone().at_mat(0, 0), res_angular_angular.clone().at_mat(0, 1), res_angular_angular.clone().at_mat(0, 2)],
-        [res_angular_linear.clone().at_mat(1, 0), res_angular_linear.clone().at_mat(1, 1), res_angular_linear.clone().at_mat(1, 2), res_angular_angular.clone().at_mat(1, 0), res_angular_angular.clone().at_mat(1, 1), res_angular_angular.clone().at_mat(1, 2)],
-        [res_angular_linear.clone().at_mat(2, 0), res_angular_linear.clone().at_mat(2, 1), res_angular_linear.clone().at_mat(2, 2), res_angular_angular.clone().at_mat(2, 0), res_angular_angular.clone().at_mat(2, 1), res_angular_angular.clone().at_mat(2, 2)]
+        [mout.at_mat(0, 0), mout.at_mat(0, 1), mout.at_mat(0, 2), res_linear_angular.at_mat(0, 0), res_linear_angular.at_mat(0, 1), res_linear_angular.at_mat(0, 2)],
+        [mout.at_mat(1, 0), mout.at_mat(1, 1), mout.at_mat(1, 2), res_linear_angular.at_mat(1, 0), res_linear_angular.at_mat(1, 1), res_linear_angular.at_mat(1, 2)],
+        [mout.at_mat(2, 0), mout.at_mat(2, 1), mout.at_mat(2, 2), res_linear_angular.at_mat(2, 0), res_linear_angular.at_mat(2, 1), res_linear_angular.at_mat(2, 2)],
+        [res_angular_linear.at_mat(0, 0), res_angular_linear.at_mat(0, 1), res_angular_linear.at_mat(0, 2), res_angular_angular.at_mat(0, 0), res_angular_angular.at_mat(0, 1), res_angular_angular.at_mat(0, 2)],
+        [res_angular_linear.at_mat(1, 0), res_angular_linear.at_mat(1, 1), res_angular_linear.at_mat(1, 2), res_angular_angular.at_mat(1, 0), res_angular_angular.at_mat(1, 1), res_angular_angular.at_mat(1, 2)],
+        [res_angular_linear.at_mat(2, 0), res_angular_linear.at_mat(2, 1), res_angular_linear.at_mat(2, 2), res_angular_angular.at_mat(2, 0), res_angular_angular.at_mat(2, 1), res_angular_angular.at_mat(2, 2)]
     ).define(format!("add_force_cross_matrix_{joint_id}").as_str())
     
 
@@ -402,12 +402,12 @@ fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNod
 //}
 fn act_constraint(rotation: &ASTNode, translation: &ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
     let rotation_col = Vector!(
-        rotation.clone().at_mat(0, 2),
-        rotation.clone().at_mat(1, 2),
-        rotation.clone().at_mat(2, 2)
+        rotation.at_mat(0, 2),
+        rotation.at_mat(1, 2),
+        rotation.at_mat(2, 2)
     ).define(format!("act_constraint_rotation_col_{}", joint_id).as_str());
 
-    let linear = (translation.clone().cross(rotation_col.clone())).define(format!("act_constraint_linear_{}", joint_id).as_str());
+    let linear = (translation.clone().cross(&rotation_col)).define(format!("act_constraint_linear_{}", joint_id).as_str());
 
     (linear, rotation_col)
 }
@@ -416,28 +416,28 @@ fn act_constraint(rotation: &ASTNode, translation: &ASTNode, joint_id: usize) ->
 //      v.angular().noalias() = m.rotation()*angular();
 //      v.linear().noalias() = m.rotation()*linear() + m.translation().cross(v.angular());
 fn act_motion1(
-    rotation: ASTNode, 
-    translation: ASTNode, 
-    linear: ASTNode, 
-    angular: ASTNode, 
+    rotation: &ASTNode, 
+    translation: &ASTNode, 
+    linear: &ASTNode, 
+    angular: &ASTNode, 
     joint_id: usize
 ) -> ASTNode {
 
-    let rotation_crosss_linear = (rotation.clone().cross(linear.clone())).define(format!("motion_act_linear_{}", joint_id).as_str());
-    let rotation_cross_angular = (rotation.clone().cross(angular.clone())).define(format!("motion_act_angular_{}", joint_id).as_str());
+    let rotation_crosss_linear = (rotation.cross(linear)).define(format!("motion_act_linear_{}", joint_id).as_str());
+    let rotation_cross_angular = (rotation.cross(angular)).define(format!("motion_act_angular_{}", joint_id).as_str());
 
-    let res_angular = rotation_cross_angular.clone();
+    let res_angular = rotation_cross_angular;
 
-    let cross = translation.clone().cross(res_angular.clone()).define(format!("motion_act_cross_{}", joint_id).as_str());
-    let res_linear = (rotation_crosss_linear.clone() + cross.clone()).define(format!("motion_act_linear2_{}", joint_id).as_str());
+    let cross = translation.cross(&res_angular).define(format!("motion_act_cross_{}", joint_id).as_str());
+    let res_linear = (rotation_crosss_linear + cross).define(format!("motion_act_linear2_{}", joint_id).as_str());
 
     Vector!(
-        res_linear.clone().at_vec(0),
-        res_linear.clone().at_vec(1),
-        res_linear.clone().at_vec(2),
-        res_angular.clone().at_vec(0),
-        res_angular.clone().at_vec(1),
-        res_angular.clone().at_vec(2)
+        res_linear.at_vec(0),
+        res_linear.at_vec(1),
+        res_linear.at_vec(2),
+        res_angular.at_vec(0),
+        res_angular.at_vec(1),
+        res_angular.at_vec(2)
     ).define(format!("act_motion_res_{}", joint_id).as_str())
 }
 
@@ -446,51 +446,51 @@ fn act_motion1(
 //      v.angular().noalias() = m.rotation()*angular();
 //      v.linear().noalias() = m.rotation()*linear() + m.translation().cross(v.angular());
 fn act_motion(
-    rotation: ASTNode, 
-    translation: ASTNode, 
-    t: ASTNode, 
+    rotation: &ASTNode, 
+    translation: &ASTNode, 
+    t: &ASTNode, 
     joint_id: usize
 ) -> ASTNode {
 
     let linear = Vector!(
-        t.clone().at_vec(0),
-        t.clone().at_vec(1),
-        t.clone().at_vec(2)
+        t.at_vec(0),
+        t.at_vec(1),
+        t.at_vec(2)
     ).define(format!("t_linear_{}", joint_id).as_str());
     let angular = Vector!(
-        t.clone().at_vec(3),
-        t.clone().at_vec(4),
-        t.clone().at_vec(5)
+        t.at_vec(3),
+        t.at_vec(4),
+        t.at_vec(5)
     ).define(format!("t_angular_{}", joint_id).as_str());
 
-    let rotation_crosss_linear = (rotation.clone().cross(linear.clone())).define(format!("motion_act_linear_{}", joint_id).as_str());
-    let rotation_cross_angular = (rotation.clone().cross(angular.clone())).define(format!("motion_act_angular_{}", joint_id).as_str());
+    let rotation_crosss_linear = (rotation.cross(&linear)).define(format!("motion_act_linear_{}", joint_id).as_str());
+    let rotation_cross_angular = (rotation.cross(&angular)).define(format!("motion_act_angular_{}", joint_id).as_str());
 
     let res_angular = rotation_cross_angular.clone();
 
-    let cross = translation.clone().cross(res_angular.clone()).define(format!("motion_act_cross_{}", joint_id).as_str());
-    let res_linear = (rotation_crosss_linear.clone() + cross.clone()).define(format!("motion_act_linear2_{}", joint_id).as_str());
+    let cross = translation.cross(&res_angular).define(format!("motion_act_cross_{}", joint_id).as_str());
+    let res_linear = (rotation_crosss_linear + cross).define(format!("motion_act_linear2_{}", joint_id).as_str());
 
     Vector!(
-        res_linear.clone().at_vec(0),
-        res_linear.clone().at_vec(1),
-        res_linear.clone().at_vec(2),
-        res_angular.clone().at_vec(0),
-        res_angular.clone().at_vec(1),
-        res_angular.clone().at_vec(2)
+        res_linear.at_vec(0),
+        res_linear.at_vec(1),
+        res_linear.at_vec(2),
+        res_angular.at_vec(0),
+        res_angular.at_vec(1),
+        res_angular.at_vec(2)
     ).define(format!("act_motion_res_{}", joint_id).as_str())
 }
 
 // I strongly disagree with this function's name, but it is actInv in pinocchio,
 // so I will leave it as is for now
-fn act_motion_inv(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, angular: &ASTNode, linear_parent: ASTNode, angular_parent: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
-    let act_inv1 = translation.clone().cross(angular_parent.clone()).define(format!("actInv1_{}", joint_id).as_str());
-    let act_inv2 = (linear_parent.clone() - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
-    let act_inv3 = rotation.clone().transpose().define(format!("actInv3_{}", joint_id).as_str());
-    let act_inv4 = (act_inv3.clone().cross(act_inv2)).define(format!("actInv4_{}", joint_id).as_str());
-    let new_linear = (linear.clone() + act_inv4).define(format!("act_inv_linear_{}", joint_id).as_str());
-    let act_inv5 = (act_inv3.clone().cross(angular_parent.clone())).define(format!("actInv5_{}", joint_id).as_str());
-    let new_angular = (angular.clone() + act_inv5).define(format!("act_inv_angular_{}", joint_id).as_str());
+fn act_motion_inv(translation: &ASTNode, rotation: &ASTNode, linear: ASTNode, angular: ASTNode, linear_parent: ASTNode, angular_parent: &ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
+    let act_inv1 = translation.cross(angular_parent).define(format!("actInv1_{}", joint_id).as_str());
+    let act_inv2 = (linear_parent - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
+    let act_inv3 = rotation.transpose().define(format!("actInv3_{}", joint_id).as_str());
+    let act_inv4 = (act_inv3.cross(&act_inv2)).define(format!("actInv4_{}", joint_id).as_str());
+    let new_linear = (linear + act_inv4).define(format!("act_inv_linear_{}", joint_id).as_str());
+    let act_inv5 = (act_inv3.cross(angular_parent)).define(format!("actInv5_{}", joint_id).as_str());
+    let new_angular = (angular + act_inv5).define(format!("act_inv_angular_{}", joint_id).as_str());
 
     (new_linear, new_angular)
 }
@@ -518,12 +518,12 @@ fn act_motion_inv(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, a
 /// -0.000139  0.697493
 /// 0.013544  0.038338
 fn decompose_it_i(i: &ASTNode) -> ASTNode {
-    let l0 = i.clone().at_mat(0, 0) - i.clone().at_mat(2, 2);
-    let l1 = i.clone().at_mat(0, 1);
-    let l2 = i.clone().at_mat(0, 1);
-    let l3 = i.clone().at_mat(1, 1) - i.clone().at_mat(2, 2);
-    let l4 = Scalar!(2.0) * i.clone().at_mat(0, 2);
-    let l5 = i.clone().at_mat(1, 2) + i.clone().at_mat(1, 2);
+    let l0 = i.at_mat(0, 0) - i.at_mat(2, 2);
+    let l1 = i.at_mat(0, 1);
+    let l2 = i.at_mat(0, 1);
+    let l3 = i.at_mat(1, 1) - i.at_mat(2, 2);
+    let l4 = Scalar!(2.0) * i.at_mat(0, 2);
+    let l5 = i.at_mat(1, 2) + i.at_mat(1, 2);
     let l = Matrix!(
         [l0, l1],
         [l2, l3],
@@ -579,25 +579,25 @@ fn symmetric3_rotate(
     // const Matrix2 Y( R.template block<2,3>(1,0) * L );
     // R.template block<2,3>(1,0) takes the bottom two rows of R
     let bottom_r = Matrix!(
-        [r.clone().at_mat(1, 0), r.clone().at_mat(1, 1), r.clone().at_mat(1, 2)],
-        [r.clone().at_mat(2, 0), r.clone().at_mat(2, 1), r.clone().at_mat(2, 2)]
+        [r.at_mat(1, 0), r.at_mat(1, 1), r.at_mat(1, 2)],
+        [r.at_mat(2, 0), r.at_mat(2, 1), r.at_mat(2, 2)]
     ).define("rotate_bottom_r");
 
-    let y = (bottom_r.cross(l.clone())).define("rotate_y");
+    let y = (bottom_r.cross(&l)).define("rotate_y");
 
-    let sres_first_1 = (y.clone().at_mat(0, 0) * r.clone().at_mat(0, 0) + y.clone().at_mat(0, 1) * r.clone().at_mat(0, 1)).define("sres_first_1");
-    let sres_first_2 = (y.clone().at_mat(0, 0) * r.clone().at_mat(1, 0) + y.clone().at_mat(0, 1) * r.clone().at_mat(1, 1)).define("sres_first_2");
-    let sres_first_3 = (y.clone().at_mat(1, 0) * r.clone().at_mat(0, 0) + y.clone().at_mat(1, 1) * r.clone().at_mat(0, 1)).define("sres_first_3");
-    let sres_first_4 = (y.clone().at_mat(1, 0) * r.clone().at_mat(1, 0) + y.clone().at_mat(1, 1) * r.clone().at_mat(1, 1)).define("sres_first_4");
-    let sres_first_5 = (y.clone().at_mat(1, 0) * r.clone().at_mat(2, 0) + y.clone().at_mat(1, 1) * r.clone().at_mat(2, 1)).define("sres_first_5");
+    let sres_first_1 = (y.at_mat(0, 0) * r.at_mat(0, 0) + y.at_mat(0, 1) * r.at_mat(0, 1)).define("sres_first_1");
+    let sres_first_2 = (y.at_mat(0, 0) * r.at_mat(1, 0) + y.at_mat(0, 1) * r.at_mat(1, 1)).define("sres_first_2");
+    let sres_first_3 = (y.at_mat(1, 0) * r.at_mat(0, 0) + y.at_mat(1, 1) * r.at_mat(0, 1)).define("sres_first_3");
+    let sres_first_4 = (y.at_mat(1, 0) * r.at_mat(1, 0) + y.at_mat(1, 1) * r.at_mat(1, 1)).define("sres_first_4");
+    let sres_first_5 = (y.at_mat(1, 0) * r.at_mat(2, 0) + y.at_mat(1, 1) * r.at_mat(2, 1)).define("sres_first_5");
 
     //    const Vector3 r(-R(0,0)*m_data(4) + R(0,1)*m_data(3),
     //                    -R(1,0)*m_data(4) + R(1,1)*m_data(3),
     //                    -R(2,0)*m_data(4) + R(2,1)*m_data(3));
     let const_r = Vector!(
-        -(r.clone().at_mat(0, 0) * s.clone().at_mat(1, 2)) + r.clone().at_mat(0, 1) * s.clone().at_mat(0, 2),
-        -(r.clone().at_mat(1, 0) * s.clone().at_mat(1, 2)) + r.clone().at_mat(1, 1) * s.clone().at_mat(0, 2),
-        -(r.clone().at_mat(2, 0) * s.clone().at_mat(1, 2)) + r.clone().at_mat(2, 1) * s.clone().at_mat(0, 2)
+        -(r.at_mat(0, 0) * s.at_mat(1, 2)) + r.at_mat(0, 1) * s.at_mat(0, 2),
+        -(r.at_mat(1, 0) * s.at_mat(1, 2)) + r.at_mat(1, 1) * s.at_mat(0, 2),
+        -(r.at_mat(2, 0) * s.at_mat(1, 2)) + r.at_mat(2, 1) * s.at_mat(0, 2)
     ).define("const_r");
 
 //    Sres.m_data(0) = L(0,0) + L(1,1) - Sres.m_data(2) - Sres.m_data(5);
@@ -607,18 +607,18 @@ fn symmetric3_rotate(
 //    Sres.m_data(1) += r(2); Sres.m_data(2)+= m_data(5);
 //    Sres.m_data(3) +=-r(1); Sres.m_data(4)+= r(0); Sres.m_data(5) += m_data(5);
 
-    // let sres_update_0 = l.clone().at_mat(0, 0) + l.clone().at_mat(1, 1) - sres_first_2.clone() - sres_first_5.clone();
-    let sres_update_0_tmp1 = (l.clone().at_mat(0, 0) + l.clone().at_mat(1, 1)).define("sres_update_0_tmp1");
+    // let sres_update_0 = l.at_mat(0, 0) + l.at_mat(1, 1) - sres_first_2.clone() - sres_first_5.clone();
+    let sres_update_0_tmp1 = (l.at_mat(0, 0) + l.at_mat(1, 1)).define("sres_update_0_tmp1");
     let sres_update_0_tmp2 = (sres_first_2.clone() + sres_first_5.clone()).define("sres_update_0_tmp2");
-    let sres_update_0 = (sres_update_0_tmp1.clone() - sres_update_0_tmp2.clone()).define("sres_update_0");
+    let sres_update_0 = (sres_update_0_tmp1 - sres_update_0_tmp2).define("sres_update_0");
 
 
-    let sres_final_0 = sres_update_0 + s.clone().at_mat(2, 2);
-    let sres_final_1 = sres_first_1.clone() + const_r.clone().at_vec(2);
-    let sres_final_2 = sres_first_2.clone() + s.clone().at_mat(2, 2);
-    let sres_final_3 = sres_first_3.clone() - const_r.clone().at_vec(1);
-    let sres_final_4 = sres_first_4.clone() + const_r.clone().at_vec(0);
-    let sres_final_5 = sres_first_5.clone() + s.clone().at_mat(2, 2);
+    let sres_final_0 = sres_update_0 + s.at_mat(2, 2);
+    let sres_final_1 = sres_first_1.clone() + const_r.at_vec(2);
+    let sres_final_2 = sres_first_2.clone() + s.at_mat(2, 2);
+    let sres_final_3 = sres_first_3.clone() - const_r.at_vec(1);
+    let sres_final_4 = sres_first_4.clone() + const_r.at_vec(0);
+    let sres_final_5 = sres_first_5.clone() + s.at_mat(2, 2);
 
     // res(0,0) = m_data(0); res(0,1) = m_data(1); res(0,2) = m_data(3);
     // res(1,0) = m_data(1); res(1,1) = m_data(2); res(1,2) = m_data(4);
@@ -648,12 +648,11 @@ fn symmetric3_rotate(
 fn act_inertia(
     rotation: &ASTNode, // of oMi
     translation: &ASTNode, // of oMi
-    mass: &ASTNode,
     lever: &ASTNode,
     inertia: &ASTNode,    
 ) -> (ASTNode, ASTNode) {
-    let new_translation_temp = (rotation.clone().cross(lever.clone())).define("new_translation_temp");
-    let new_translation = (translation.clone() + new_translation_temp.clone()).define("new_translation");
+    let new_translation_temp = (rotation.cross(lever)).define("new_translation_temp");
+    let new_translation = (translation + new_translation_temp).define("new_translation");
     let new_rotation = symmetric3_rotate(inertia, rotation);
 
     (new_translation, new_rotation)
@@ -706,15 +705,15 @@ fn first_pass(
     // I will keep it as is
 
     let mut new_v_linear = Vector!(
-        data_v.clone().at_vec(0),
-        data_v.clone().at_vec(1),
-        data_v.clone().at_vec(2)
+        data_v.at_vec(0),
+        data_v.at_vec(1),
+        data_v.at_vec(2)
     ).define(format!("v_linear_{}", joint_id).as_str());
 
     let mut new_v_angular = Vector!(
-        data_v.clone().at_vec(3),
-        data_v.clone().at_vec(4),
-        v.clone().at_vec(joint_id)
+        data_v.at_vec(3),
+        data_v.at_vec(4),
+        v.at_vec(joint_id)
     ).define(format!("v_angular_{}", joint_id).as_str());
 
     let parent_v = match joint_id {
@@ -723,15 +722,15 @@ fn first_pass(
     };
 
     let parent_v_linear = Vector!(
-        parent_v.clone().at_vec(0),
-        parent_v.clone().at_vec(1),
-        parent_v.clone().at_vec(2)
+        parent_v.at_vec(0),
+        parent_v.at_vec(1),
+        parent_v.at_vec(2)
     ).define(format!("parent_v_linear_{}", joint_id).as_str());
 
     let parent_v_angular = Vector!(
-        parent_v.clone().at_vec(3),
-        parent_v.clone().at_vec(4),
-        parent_v.clone().at_vec(5)
+        parent_v.at_vec(3),
+        parent_v.at_vec(4),
+        parent_v.at_vec(5)
     ).define(format!("parent_v_angular_{}", joint_id).as_str());
 
     let parent_a = match joint_id {
@@ -740,15 +739,15 @@ fn first_pass(
     };
 
     let parent_a_linear = Vector!(
-        parent_a.clone().at_vec(0),
-        parent_a.clone().at_vec(1),
-        parent_a.clone().at_vec(2)
+        parent_a.at_vec(0),
+        parent_a.at_vec(1),
+        parent_a.at_vec(2)
     ).define(format!("parent_a_linear_{}", joint_id).as_str());
 
     let parent_a_angular = Vector!(
-        parent_a.clone().at_vec(3),
-        parent_a.clone().at_vec(4),
-        parent_a.clone().at_vec(5)
+        parent_a.at_vec(3),
+        parent_a.at_vec(4),
+        parent_a.at_vec(5)
     ).define(format!("parent_a_angular_{}", joint_id).as_str());
 
 
@@ -765,21 +764,28 @@ fn first_pass(
             // the multiplication between oMi and liMi is defined as:
             //{ return SE3Tpl(rot*m2.rotation()
             //    ,translation()+rotation()*m2.translation());}
-            let omi_rotation_i = (oMis[joint_id - 1].0.clone().cross(limi_rotation.clone())).define(format!("oMi_rotation_{}", joint_id).as_str());
-            let omi_translation_to_add = (oMis[joint_id - 1].0.clone().cross(limi_translation.clone())).define(format!("oMi_translation_to_add_{}", joint_id).as_str());
-            let omi_translation_i = (oMis[joint_id - 1].1.clone() + omi_translation_to_add.clone()).define(format!("oMi_translation_{}", joint_id).as_str());
+            let omi_rotation_i = (oMis[joint_id - 1].0.cross(&limi_rotation)).define(format!("oMi_rotation_{}", joint_id).as_str());
+            let omi_translation_to_add = (oMis[joint_id - 1].0.cross(&limi_translation)).define(format!("oMi_translation_to_add_{}", joint_id).as_str());
+            let omi_translation_i = (&oMis[joint_id - 1].1 + omi_translation_to_add).define(format!("oMi_translation_{}", joint_id).as_str());
             oMis.push((omi_rotation_i.clone(), omi_translation_i.clone()));
-            (new_v_linear, new_v_angular) = act_motion_inv(&limi_translation, &limi_rotation, &new_v_linear, &new_v_angular, parent_v_linear, parent_v_angular, joint_id);
+            (new_v_linear, new_v_angular) = act_motion_inv(
+                &limi_translation, 
+                &limi_rotation, 
+                new_v_linear, 
+                new_v_angular, 
+                parent_v_linear, 
+                &parent_v_angular, 
+                joint_id);
         }
     }
     // as the calculation of data.v[i] is done here, we can push it to all_v
     all_v.push(Vector!(
-        new_v_linear.clone().at_vec(0),
-        new_v_linear.clone().at_vec(1),
-        new_v_linear.clone().at_vec(2),
-        new_v_angular.clone().at_vec(0),
-        new_v_angular.clone().at_vec(1),
-        new_v_angular.clone().at_vec(2)
+        new_v_linear.at_vec(0),
+        new_v_linear.at_vec(1),
+        new_v_linear.at_vec(2),
+        new_v_angular.at_vec(0),
+        new_v_angular.at_vec(1),
+        new_v_angular.at_vec(2)
     ).define(format!("all_v_{}", joint_id).as_str()));
 
 
@@ -791,9 +797,9 @@ fn first_pass(
     //data.a_gf[i] = jdata.c() + (data.v[i] ^ jdata.v());
     // ^ operator is actually implemented in pinocchio/include/pinocchio/spatial/cartesian-axis.hpp inline void CartesianAxis<2>::alphaCross
     // vout_[0] = -s*vin[1]; vout_[1] = s*vin[0]; vout_[2] = 0.;
-    let minus_m_w = (-(v.clone().at_vec(joint_id))).define(format!("minus_m_w_{}", joint_id).as_str());
-    let alpha_cross_linear = alpha_cross_linear(minus_m_w.clone(), new_v_linear.clone(), joint_id);
-    let alpha_cross_angular = alpha_cross_angular(minus_m_w.clone(), new_v_angular.clone(), joint_id);
+    let minus_m_w = (-(v.at_vec(joint_id))).define(format!("minus_m_w_{}", joint_id).as_str());
+    let alpha_cross_linear = alpha_cross_linear(&minus_m_w, &new_v_linear, joint_id);
+    let alpha_cross_angular = alpha_cross_angular(&minus_m_w, &new_v_angular, joint_id);
     
     // data.a_gf[i] += jdata.S() * jmodel.jointVelocitySelector(a);
     // jointVelocitySelector(a) is only a[joint_id]
@@ -801,23 +807,23 @@ fn first_pass(
     // data.a_gf[i][5] = jmodel.jointVelocitySelector(a)
     
     let mut new_data_a = Vector!(
-        alpha_cross_linear.clone().at_vec(0),
-        alpha_cross_linear.clone().at_vec(1),
-        alpha_cross_linear.clone().at_vec(2),
-        alpha_cross_angular.clone().at_vec(0),
-        alpha_cross_angular.clone().at_vec(1),
-        a.clone().at_vec(joint_id)
+        alpha_cross_linear.at_vec(0),
+        alpha_cross_linear.at_vec(1),
+        alpha_cross_linear.at_vec(2),
+        alpha_cross_angular.at_vec(0),
+        alpha_cross_angular.at_vec(1),
+        a.at_vec(joint_id)
     ).define(format!("new_data_a_{}", joint_id).as_str());
 
     let temp_a_linear = Vector!(
-        new_data_a.clone().at_vec(0),
-        new_data_a.clone().at_vec(1),
-        new_data_a.clone().at_vec(2)
+        new_data_a.at_vec(0),
+        new_data_a.at_vec(1),
+        new_data_a.at_vec(2)
     ).define(format!("temp_a_linear_{}", joint_id).as_str());
     let temp_a_angular = Vector!(
-        new_data_a.clone().at_vec(3),
-        new_data_a.clone().at_vec(4),
-        new_data_a.clone().at_vec(5)
+        new_data_a.at_vec(3),
+        new_data_a.at_vec(4),
+        new_data_a.at_vec(5)
     ).define(format!("temp_a_angular_{}", joint_id).as_str());
 
     //if(parent > 0)
@@ -828,15 +834,16 @@ fn first_pass(
     match joint_id {
         0 => (),
         _ => {
-            let limi_actInv_a_parent = act_motion_inv(&limi_translation, &limi_rotation, &temp_a_linear, &temp_a_angular, parent_a_linear, parent_a_angular, joint_id);
+            let limi_actInv_a_parent = act_motion_inv(
+                &limi_translation, &limi_rotation, temp_a_linear, temp_a_angular, parent_a_linear, &parent_a_angular, joint_id);
     
             new_data_a = Vector!(
-                limi_actInv_a_parent.0.clone().at_vec(0),
-                limi_actInv_a_parent.0.clone().at_vec(1),
-                limi_actInv_a_parent.0.clone().at_vec(2),
-                limi_actInv_a_parent.1.clone().at_vec(0),
-                limi_actInv_a_parent.1.clone().at_vec(1),
-                limi_actInv_a_parent.1.clone().at_vec(2)
+                limi_actInv_a_parent.0.at_vec(0),
+                limi_actInv_a_parent.0.at_vec(1),
+                limi_actInv_a_parent.0.at_vec(2),
+                limi_actInv_a_parent.1.at_vec(0),
+                limi_actInv_a_parent.1.at_vec(1),
+                limi_actInv_a_parent.1.at_vec(2)
             ).define(format!("a_final_{}", joint_id).as_str());
              
         }
@@ -846,16 +853,16 @@ fn first_pass(
 
     // all of these act functions are different than rnea.rs
     // data.oYcrb[i] = data.oinertias[i] = data.oMi[i].act(model.inertias[i]);
-    let (data_oycrb_trans_i, data_oycrb_rot_i) = act_inertia(&oMis[joint_id].0, &oMis[joint_id].1, masses, &levers[joint_id], &inertias[joint_id]);
+    let (data_oycrb_trans_i, data_oycrb_rot_i) = act_inertia(&oMis[joint_id].0, &oMis[joint_id].1, &levers[joint_id], &inertias[joint_id]);
     let data_oinertias_trans_i = data_oycrb_trans_i.clone().define(format!("data_oinertias_trans_{}", joint_id).as_str());
     let data_oinertias_rot_i = data_oycrb_rot_i.clone().define(format!("data_oinertias_rot_{}", joint_id).as_str());
 
     all_oycrb.push(data_oinertias_rot_i);
 
     // ov = data.oMi[i].act(data.v[i]);
-    let ov = act_motion1(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_v_linear.clone(), new_v_angular.clone(), joint_id).define(format!("ov_{}", joint_id).as_str());
+    let ov = act_motion1(&oMis[joint_id].0, &oMis[joint_id].1, &new_v_linear, &new_v_angular, joint_id).define(format!("ov_{}", joint_id).as_str());
     // oa = data.oMi[i].act(data.a[i]);
-    let oa = act_motion(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_data_a.clone(), joint_id).define(format!("oa_{}", joint_id).as_str());
+    let oa = act_motion(&oMis[joint_id].0, &oMis[joint_id].1, &new_data_a, joint_id).define(format!("oa_{}", joint_id).as_str());
 
     // push ov
     all_ov.push(ov.clone());
@@ -879,32 +886,32 @@ fn first_pass(
     //Symmetric3::rhsMult(inertia(),v.angular(),f.angular());
     //f.angular() += lever().cross(f.linear());
     let ov_linear = Vector!(
-        ov.clone().at_vec(0),
-        ov.clone().at_vec(1),
-        ov.clone().at_vec(2)
+        ov.at_vec(0),
+        ov.at_vec(1),
+        ov.at_vec(2)
     ).define(format!("ov_linear_{}", joint_id).as_str());
     let ov_angular = Vector!(
-        ov.clone().at_vec(3),
-        ov.clone().at_vec(4),
-        ov.clone().at_vec(5)
+        ov.at_vec(3),
+        ov.at_vec(4),
+        ov.at_vec(5)
     ).define(format!("ov_angular_{}", joint_id).as_str());
 
-    let data_oh_linear_temp1 = data_oycrb_trans_i.clone().cross(ov_angular.clone()).define(format!("data_oh_linear_temp1_{}", joint_id).as_str());
-    let data_oh_linear_temp2 = (ov_linear.clone() - data_oh_linear_temp1.clone()).define(format!("data_oh_linear_temp2_{}", joint_id).as_str());
-    let data_oh_linear = (masses.clone().at_vec(joint_id) * data_oh_linear_temp2.clone()).define(format!("data_oh_linear_{}", joint_id).as_str());
+    let data_oh_linear_temp1 = data_oycrb_trans_i.cross(&ov_angular).define(format!("data_oh_linear_temp1_{}", joint_id).as_str());
+    let data_oh_linear_temp2 = (ov_linear.clone() - data_oh_linear_temp1).define(format!("data_oh_linear_temp2_{}", joint_id).as_str());
+    let data_oh_linear = (masses.at_vec(joint_id) * data_oh_linear_temp2).define(format!("data_oh_linear_{}", joint_id).as_str());
 
     let data_oh_angular_temp = rhs_mult(data_oycrb_rot_i.clone(), ov_angular.clone(), joint_id);
-    let data_oh_angular_temp2 = data_oycrb_trans_i.clone().cross(data_oh_linear.clone()).define(format!("data_oh_angular_temp2_{}", joint_id).as_str());
-    let data_oh_angular = (data_oh_angular_temp.clone() + data_oh_angular_temp2.clone()).define(format!("data_oh_angular_{}", joint_id).as_str());
+    let data_oh_angular_temp2 = data_oycrb_trans_i.cross(&data_oh_linear).define(format!("data_oh_angular_temp2_{}", joint_id).as_str());
+    let data_oh_angular = (data_oh_angular_temp + data_oh_angular_temp2).define(format!("data_oh_angular_{}", joint_id).as_str());
     
     // push to all_oh
     all_oh.push(Vector!(
-        data_oh_linear.clone().at_vec(0),
-        data_oh_linear.clone().at_vec(1),
-        data_oh_linear.clone().at_vec(2),
-        data_oh_angular.clone().at_vec(0),
-        data_oh_angular.clone().at_vec(1),
-        data_oh_angular.clone().at_vec(2)
+        data_oh_linear.at_vec(0),
+        data_oh_linear.at_vec(1),
+        data_oh_linear.at_vec(2),
+        data_oh_angular.at_vec(0),
+        data_oh_angular.at_vec(1),
+        data_oh_angular.at_vec(2)
     ).define(format!("all_oh_{}", joint_id).as_str()));
 
     //data.of[i] = data.oYcrb[i] * oa_gf + ov.cross(data.oh[i]);
@@ -922,41 +929,41 @@ fn first_pass(
     }
     */
     let oa_gf_linear = Vector!(
-        oa_gf.clone().at_vec(0),
-        oa_gf.clone().at_vec(1),
-        oa_gf.clone().at_vec(2)
+        oa_gf.at_vec(0),
+        oa_gf.at_vec(1),
+        oa_gf.at_vec(2)
     ).define(format!("oa_gf_linear_{}", joint_id).as_str());
     let oa_gf_angular = Vector!(
-        oa_gf.clone().at_vec(3),
-        oa_gf.clone().at_vec(4),
-        oa_gf.clone().at_vec(5)
+        oa_gf.at_vec(3),
+        oa_gf.at_vec(4),
+        oa_gf.at_vec(5)
     ).define(format!("oa_gf_angular_{}", joint_id).as_str());
 
-    let data_of_linear_temp1 = data_oycrb_trans_i.clone().cross(oa_gf_angular.clone()).define(format!("data_of_linear_temp1_{}", joint_id).as_str());
+    let data_of_linear_temp1 = data_oycrb_trans_i.cross(&oa_gf_angular).define(format!("data_of_linear_temp1_{}", joint_id).as_str());
     let data_of_linear_temp2 = (oa_gf_linear.clone() - data_of_linear_temp1.clone()).define(format!("data_of_linear_temp2_{}", joint_id).as_str());
-    let data_of_linear_temp3 = (masses.clone().at_vec(joint_id) * data_of_linear_temp2.clone()).define(format!("data_of_linear_temp3_{}", joint_id).as_str());
+    let data_of_linear_temp3 = (masses.at_vec(joint_id) * data_of_linear_temp2.clone()).define(format!("data_of_linear_temp3_{}", joint_id).as_str());
 
     let data_of_angular_temp = rhs_mult(data_oycrb_rot_i.clone(), oa_gf_angular.clone(), joint_id);
-    let data_of_angular_temp2 = data_oycrb_trans_i.clone().cross(data_of_linear_temp3.clone()).define(format!("data_of_angular_temp2_{}", joint_id).as_str());
+    let data_of_angular_temp2 = data_oycrb_trans_i.cross(&data_of_linear_temp3).define(format!("data_of_angular_temp2_{}", joint_id).as_str());
     let data_of_angular_temp3 = (data_of_angular_temp.clone() + data_of_angular_temp2.clone()).define(format!("data_of_angular_temp3_{}", joint_id).as_str());
 
     // now ov.cross(data_oh[i])
-    let data_of_linear_temp4 = ov_angular.clone().cross(data_oh_linear.clone()).define(format!("data_of_linear_temp4_{}", joint_id).as_str());
+    let data_of_linear_temp4 = ov_angular.cross(&data_oh_linear.clone()).define(format!("data_of_linear_temp4_{}", joint_id).as_str());
 
-    let data_of_angular_temp4 = ov_angular.clone().cross(data_oh_angular.clone()).define(format!("data_of_angular_temp4_{}", joint_id).as_str());
-    let data_of_angular_temp5 = ov_linear.clone().cross(data_oh_linear.clone()).define(format!("data_of_angular_temp5_{}", joint_id).as_str());
+    let data_of_angular_temp4 = ov_angular.cross(&data_oh_angular).define(format!("data_of_angular_temp4_{}", joint_id).as_str());
+    let data_of_angular_temp5 = ov_linear.cross(&data_oh_linear).define(format!("data_of_angular_temp5_{}", joint_id).as_str());
     let data_of_angular_temp6 = (data_of_angular_temp4.clone() + data_of_angular_temp5.clone()).define(format!("data_of_angular_temp6_{}", joint_id).as_str());
 
     let data_of_linear = (data_of_linear_temp3.clone() + data_of_linear_temp4.clone()).define(format!("data_of_linear_{}", joint_id).as_str());
     let data_of_angular = (data_of_angular_temp3.clone() + data_of_angular_temp6.clone()).define(format!("data_of_angular_{}", joint_id).as_str());
     // push to all_of
     all_of.push(Vector!(
-        data_of_linear.clone().at_vec(0),
-        data_of_linear.clone().at_vec(1),
-        data_of_linear.clone().at_vec(2),
-        data_of_angular.clone().at_vec(0),
-        data_of_angular.clone().at_vec(1),
-        data_of_angular.clone().at_vec(2)
+        data_of_linear.at_vec(0),
+        data_of_linear.at_vec(1),
+        data_of_linear.at_vec(2),
+        data_of_angular.at_vec(0),
+        data_of_angular.at_vec(1),
+        data_of_angular.at_vec(2)
     ).define(format!("all_of_{}", joint_id).as_str()));
     // Correct until here
     
@@ -967,24 +974,24 @@ fn first_pass(
 
     // push to j_cols
     j_cols.push(Vector!(
-        J_cols_linear.clone().at_vec(0),
-        J_cols_linear.clone().at_vec(1),
-        J_cols_linear.clone().at_vec(2),
-        J_cols_angular.clone().at_vec(0),
-        J_cols_angular.clone().at_vec(1),
-        J_cols_angular.clone().at_vec(2)
+        J_cols_linear.at_vec(0),
+        J_cols_linear.at_vec(1),
+        J_cols_linear.at_vec(2),
+        J_cols_angular.at_vec(0),
+        J_cols_angular.at_vec(1),
+        J_cols_angular.at_vec(2)
     ).define(format!("j_cols_{}", joint_id).as_str()));
     
     //motionSet::motionAction(ov,J_cols,dJ_cols);
     let (dJ_cols_linear, dJ_cols_angular) = motionAction(&ov_linear, &ov_angular, &J_cols_linear, &J_cols_angular, joint_id);
 
     dj_cols.push(Vector!(
-        dJ_cols_linear.clone().at_vec(0),
-        dJ_cols_linear.clone().at_vec(1),
-        dJ_cols_linear.clone().at_vec(2),
-        dJ_cols_angular.clone().at_vec(0),
-        dJ_cols_angular.clone().at_vec(1),
-        dJ_cols_angular.clone().at_vec(2)
+        dJ_cols_linear.at_vec(0),
+        dJ_cols_linear.at_vec(1),
+        dJ_cols_linear.at_vec(2),
+        dJ_cols_angular.at_vec(0),
+        dJ_cols_angular.at_vec(1),
+        dJ_cols_angular.at_vec(2)
     ).define(format!("dj_cols_{}", joint_id).as_str()));
 
     
@@ -992,17 +999,17 @@ fn first_pass(
     let oa_gf_parent_linear = match joint_id {
         0 => Vector!(0.0, 0.0, 0.0).define(format!("oa_gf_parent_linear_{}", joint_id).as_str()),
         _ => Vector!(
-            all_oa_gf[joint_id - 1].clone().at_vec(0),
-            all_oa_gf[joint_id - 1].clone().at_vec(1),
-            all_oa_gf[joint_id - 1].clone().at_vec(2)
+            all_oa_gf[joint_id - 1].at_vec(0),
+            all_oa_gf[joint_id - 1].at_vec(1),
+            all_oa_gf[joint_id - 1].at_vec(2)
         ).define(format!("oa_gf_parent_linear_{}", joint_id).as_str())
     };
     let oa_gf_parent_angular = match joint_id {
         0 => Vector!(0.0, 0.0, 9.81).define(format!("oa_gf_parent_angular_{}", joint_id).as_str()), // first oa_gf is gravity, it is hardcoded in pinocchio
         _ => Vector!(
-            all_oa_gf[joint_id - 1].clone().at_vec(3),
-            all_oa_gf[joint_id - 1].clone().at_vec(4),
-            all_oa_gf[joint_id - 1].clone().at_vec(5)
+            all_oa_gf[joint_id - 1].at_vec(3),
+            all_oa_gf[joint_id - 1].at_vec(4),
+            all_oa_gf[joint_id - 1].at_vec(5)
         ).define(format!("oa_gf_parent_angular_{}", joint_id).as_str())
     };
 
@@ -1029,14 +1036,14 @@ fn first_pass(
         _ => {
             // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
             let data_ov_parent_linear = Vector!(
-                all_ov[joint_id - 1].clone().at_vec(0),
-                all_ov[joint_id - 1].clone().at_vec(1),
-                all_ov[joint_id - 1].clone().at_vec(2)
+                all_ov[joint_id - 1].at_vec(0),
+                all_ov[joint_id - 1].at_vec(1),
+                all_ov[joint_id - 1].at_vec(2)
             ).define(format!("data_ov_parent_linear_{}", joint_id).as_str());
             let data_ov_parent_angular = Vector!(
-                all_ov[joint_id - 1].clone().at_vec(3),
-                all_ov[joint_id - 1].clone().at_vec(4),
-                all_ov[joint_id - 1].clone().at_vec(5)
+                all_ov[joint_id - 1].at_vec(3),
+                all_ov[joint_id - 1].at_vec(4),
+                all_ov[joint_id - 1].at_vec(5)
             ).define(format!("data_ov_parent_angular_{}", joint_id).as_str());
             motionAction(&data_ov_parent_linear, &data_ov_parent_angular, &J_cols_linear, &J_cols_angular, joint_id)
         }
@@ -1049,48 +1056,48 @@ fn first_pass(
         _ => {
             // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
             let data_ov_parent_linear = Vector!(
-                all_ov[joint_id - 1].clone().at_vec(0),
-                all_ov[joint_id - 1].clone().at_vec(1),
-                all_ov[joint_id - 1].clone().at_vec(2)
+                all_ov[joint_id - 1].at_vec(0),
+                all_ov[joint_id - 1].at_vec(1),
+                all_ov[joint_id - 1].at_vec(2)
             ).define(format!("data_ov_parent_linear_{}", joint_id).as_str());
             let data_ov_parent_angular = Vector!(
-                all_ov[joint_id - 1].clone().at_vec(3),
-                all_ov[joint_id - 1].clone().at_vec(4),
-                all_ov[joint_id - 1].clone().at_vec(5)
+                all_ov[joint_id - 1].at_vec(3),
+                all_ov[joint_id - 1].at_vec(4),
+                all_ov[joint_id - 1].at_vec(5)
             ).define(format!("data_ov_parent_angular_{}", joint_id).as_str());
             let (dAdq_add_linear, dAdq_add_angular) = motionAction(&data_ov_parent_linear, &data_ov_parent_angular, &dvdq_cols_linear, &dvdq_cols_angular, joint_id);
-            dAdq_cols_linear = (dAdq_cols_linear.clone() + dAdq_add_linear.clone()).define(format!("dAdq_cols_linear_{}", joint_id).as_str());
-            dAdq_cols_angular = (dAdq_cols_angular.clone() + dAdq_add_angular.clone()).define(format!("dAdq_cols_angular_{}", joint_id).as_str());
-            dAdv_cols_linear = (dAdv_cols_linear.clone() + dvdq_cols_linear.clone()).define(format!("dAdv_cols_linear_updated_{}", joint_id).as_str());
-            dAdv_cols_angular = (dAdv_cols_angular.clone() + dvdq_cols_angular.clone()).define(format!("dAdv_cols_angular_updated_{}", joint_id).as_str());
+            dAdq_cols_linear = (dAdq_cols_linear + dAdq_add_linear).define(format!("dAdq_cols_linear_{}", joint_id).as_str());
+            dAdq_cols_angular = (dAdq_cols_angular + dAdq_add_angular).define(format!("dAdq_cols_angular_{}", joint_id).as_str());
+            dAdv_cols_linear = (dAdv_cols_linear + &dvdq_cols_linear).define(format!("dAdv_cols_linear_updated_{}", joint_id).as_str());
+            dAdv_cols_angular = (dAdv_cols_angular + &dvdq_cols_angular).define(format!("dAdv_cols_angular_updated_{}", joint_id).as_str());
         }
     };
 
     dAdq_cols.push(Vector!(
-        dAdq_cols_linear.clone().at_vec(0),
-        dAdq_cols_linear.clone().at_vec(1),
-        dAdq_cols_linear.clone().at_vec(2),
-        dAdq_cols_angular.clone().at_vec(0),
-        dAdq_cols_angular.clone().at_vec(1),
-        dAdq_cols_angular.clone().at_vec(2)
+        dAdq_cols_linear.at_vec(0),
+        dAdq_cols_linear.at_vec(1),
+        dAdq_cols_linear.at_vec(2),
+        dAdq_cols_angular.at_vec(0),
+        dAdq_cols_angular.at_vec(1),
+        dAdq_cols_angular.at_vec(2)
     ).define(format!("dAdq_cols_{}", joint_id).as_str()));
 
     dAdv_cols.push(Vector!(
-        dAdv_cols_linear.clone().at_vec(0),
-        dAdv_cols_linear.clone().at_vec(1),
-        dAdv_cols_linear.clone().at_vec(2),
-        dAdv_cols_angular.clone().at_vec(0),
-        dAdv_cols_angular.clone().at_vec(1),
-        dAdv_cols_angular.clone().at_vec(2)
+        dAdv_cols_linear.at_vec(0),
+        dAdv_cols_linear.at_vec(1),
+        dAdv_cols_linear.at_vec(2),
+        dAdv_cols_angular.at_vec(0),
+        dAdv_cols_angular.at_vec(1),
+        dAdv_cols_angular.at_vec(2)
     ).define(format!("dAdv_cols_{}", joint_id).as_str()));
 
     dVdq_cols.push(Vector!(
-        dvdq_cols_linear.clone().at_vec(0),
-        dvdq_cols_linear.clone().at_vec(1),
-        dvdq_cols_linear.clone().at_vec(2),
-        dvdq_cols_angular.clone().at_vec(0),
-        dvdq_cols_angular.clone().at_vec(1),
-        dvdq_cols_angular.clone().at_vec(2)
+        dvdq_cols_linear.at_vec(0),
+        dvdq_cols_linear.at_vec(1),
+        dvdq_cols_linear.at_vec(2),
+        dvdq_cols_angular.at_vec(0),
+        dvdq_cols_angular.at_vec(1),
+        dvdq_cols_angular.at_vec(2)
     ).define(format!("dVdq_cols_{}", joint_id).as_str()));
 
     
@@ -1099,7 +1106,7 @@ fn first_pass(
     //
     //addForceCrossMatrix(data.oh[i],data.doYcrb[i]);
     
-    let data_doycrb_i = inertia_variation(&data_oycrb_rot_i.clone(), &data_oycrb_trans_i.clone(), &ov_linear, &ov_angular, &masses.clone().at_vec(joint_id), joint_id);
+    let data_doycrb_i = inertia_variation(&data_oycrb_rot_i.clone(), &data_oycrb_trans_i.clone(), &ov_linear, &ov_angular, &masses.at_vec(joint_id), joint_id);
     
     let data_doycrb_i = add_force_cross_matrix(&data_oh_linear.clone(), &data_oh_angular.clone(), &data_doycrb_i.clone(), joint_id);
 
@@ -1216,8 +1223,8 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     // first pass, it takes model.joints[i], data.joints[i], model, data, q, v, a
     for i in 0..n_joints {
         first_pass(
-            qsin.clone().at_vec(i), // qsin and qcos will not change, therefore no reference needed
-            qcos.clone().at_vec(i),
+            qsin.at_vec(i), // qsin and qcos will not change, therefore no reference needed
+            qcos.at_vec(i),
             &data_v[i],
             &v,
             &a,
@@ -1248,48 +1255,48 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     // merge cols to matrices
 
     let J = Matrix!(
-        [j_cols[0].clone().at_vec(0), j_cols[1].clone().at_vec(0), j_cols[2].clone().at_vec(0), j_cols[3].clone().at_vec(0), j_cols[4].clone().at_vec(0), j_cols[5].clone().at_vec(0)],
-        [j_cols[0].clone().at_vec(1), j_cols[1].clone().at_vec(1), j_cols[2].clone().at_vec(1), j_cols[3].clone().at_vec(1), j_cols[4].clone().at_vec(1), j_cols[5].clone().at_vec(1)],
-        [j_cols[0].clone().at_vec(2), j_cols[1].clone().at_vec(2), j_cols[2].clone().at_vec(2), j_cols[3].clone().at_vec(2), j_cols[4].clone().at_vec(2), j_cols[5].clone().at_vec(2)],
-        [j_cols[0].clone().at_vec(3), j_cols[1].clone().at_vec(3), j_cols[2].clone().at_vec(3), j_cols[3].clone().at_vec(3), j_cols[4].clone().at_vec(3), j_cols[5].clone().at_vec(3)],
-        [j_cols[0].clone().at_vec(4), j_cols[1].clone().at_vec(4), j_cols[2].clone().at_vec(4), j_cols[3].clone().at_vec(4), j_cols[4].clone().at_vec(4), j_cols[5].clone().at_vec(4)],
-        [j_cols[0].clone().at_vec(5), j_cols[1].clone().at_vec(5), j_cols[2].clone().at_vec(5), j_cols[3].clone().at_vec(5), j_cols[4].clone().at_vec(5), j_cols[5].clone().at_vec(5)]
+        [j_cols[0].at_vec(0), j_cols[1].at_vec(0), j_cols[2].at_vec(0), j_cols[3].at_vec(0), j_cols[4].at_vec(0), j_cols[5].at_vec(0)],
+        [j_cols[0].at_vec(1), j_cols[1].at_vec(1), j_cols[2].at_vec(1), j_cols[3].at_vec(1), j_cols[4].at_vec(1), j_cols[5].at_vec(1)],
+        [j_cols[0].at_vec(2), j_cols[1].at_vec(2), j_cols[2].at_vec(2), j_cols[3].at_vec(2), j_cols[4].at_vec(2), j_cols[5].at_vec(2)],
+        [j_cols[0].at_vec(3), j_cols[1].at_vec(3), j_cols[2].at_vec(3), j_cols[3].at_vec(3), j_cols[4].at_vec(3), j_cols[5].at_vec(3)],
+        [j_cols[0].at_vec(4), j_cols[1].at_vec(4), j_cols[2].at_vec(4), j_cols[3].at_vec(4), j_cols[4].at_vec(4), j_cols[5].at_vec(4)],
+        [j_cols[0].at_vec(5), j_cols[1].at_vec(5), j_cols[2].at_vec(5), j_cols[3].at_vec(5), j_cols[4].at_vec(5), j_cols[5].at_vec(5)]
     ).define("J");
 
     let dJ = Matrix!(
-        [dj_cols[0].clone().at_vec(0), dj_cols[1].clone().at_vec(0), dj_cols[2].clone().at_vec(0), dj_cols[3].clone().at_vec(0), dj_cols[4].clone().at_vec(0), dj_cols[5].clone().at_vec(0)],
-        [dj_cols[0].clone().at_vec(1), dj_cols[1].clone().at_vec(1), dj_cols[2].clone().at_vec(1), dj_cols[3].clone().at_vec(1), dj_cols[4].clone().at_vec(1), dj_cols[5].clone().at_vec(1)],
-        [dj_cols[0].clone().at_vec(2), dj_cols[1].clone().at_vec(2), dj_cols[2].clone().at_vec(2), dj_cols[3].clone().at_vec(2), dj_cols[4].clone().at_vec(2), dj_cols[5].clone().at_vec(2)],
-        [dj_cols[0].clone().at_vec(3), dj_cols[1].clone().at_vec(3), dj_cols[2].clone().at_vec(3), dj_cols[3].clone().at_vec(3), dj_cols[4].clone().at_vec(3), dj_cols[5].clone().at_vec(3)],
-        [dj_cols[0].clone().at_vec(4), dj_cols[1].clone().at_vec(4), dj_cols[2].clone().at_vec(4), dj_cols[3].clone().at_vec(4), dj_cols[4].clone().at_vec(4), dj_cols[5].clone().at_vec(4)],
-        [dj_cols[0].clone().at_vec(5), dj_cols[1].clone().at_vec(5), dj_cols[2].clone().at_vec(5), dj_cols[3].clone().at_vec(5), dj_cols[4].clone().at_vec(5), dj_cols[5].clone().at_vec(5)]
+        [dj_cols[0].at_vec(0), dj_cols[1].at_vec(0), dj_cols[2].at_vec(0), dj_cols[3].at_vec(0), dj_cols[4].at_vec(0), dj_cols[5].at_vec(0)],
+        [dj_cols[0].at_vec(1), dj_cols[1].at_vec(1), dj_cols[2].at_vec(1), dj_cols[3].at_vec(1), dj_cols[4].at_vec(1), dj_cols[5].at_vec(1)],
+        [dj_cols[0].at_vec(2), dj_cols[1].at_vec(2), dj_cols[2].at_vec(2), dj_cols[3].at_vec(2), dj_cols[4].at_vec(2), dj_cols[5].at_vec(2)],
+        [dj_cols[0].at_vec(3), dj_cols[1].at_vec(3), dj_cols[2].at_vec(3), dj_cols[3].at_vec(3), dj_cols[4].at_vec(3), dj_cols[5].at_vec(3)],
+        [dj_cols[0].at_vec(4), dj_cols[1].at_vec(4), dj_cols[2].at_vec(4), dj_cols[3].at_vec(4), dj_cols[4].at_vec(4), dj_cols[5].at_vec(4)],
+        [dj_cols[0].at_vec(5), dj_cols[1].at_vec(5), dj_cols[2].at_vec(5), dj_cols[3].at_vec(5), dj_cols[4].at_vec(5), dj_cols[5].at_vec(5)]
     ).define("dJ");
 
     let dVdq = Matrix!(
-        [dVdq_cols[0].clone().at_vec(0), dVdq_cols[1].clone().at_vec(0), dVdq_cols[2].clone().at_vec(0), dVdq_cols[3].clone().at_vec(0), dVdq_cols[4].clone().at_vec(0), dVdq_cols[5].clone().at_vec(0)],
-        [dVdq_cols[0].clone().at_vec(1), dVdq_cols[1].clone().at_vec(1), dVdq_cols[2].clone().at_vec(1), dVdq_cols[3].clone().at_vec(1), dVdq_cols[4].clone().at_vec(1), dVdq_cols[5].clone().at_vec(1)],
-        [dVdq_cols[0].clone().at_vec(2), dVdq_cols[1].clone().at_vec(2), dVdq_cols[2].clone().at_vec(2), dVdq_cols[3].clone().at_vec(2), dVdq_cols[4].clone().at_vec(2), dVdq_cols[5].clone().at_vec(2)],
-        [dVdq_cols[0].clone().at_vec(3), dVdq_cols[1].clone().at_vec(3), dVdq_cols[2].clone().at_vec(3), dVdq_cols[3].clone().at_vec(3), dVdq_cols[4].clone().at_vec(3), dVdq_cols[5].clone().at_vec(3)],
-        [dVdq_cols[0].clone().at_vec(4), dVdq_cols[1].clone().at_vec(4), dVdq_cols[2].clone().at_vec(4), dVdq_cols[3].clone().at_vec(4), dVdq_cols[4].clone().at_vec(4), dVdq_cols[5].clone().at_vec(4)],
-        [dVdq_cols[0].clone().at_vec(5), dVdq_cols[1].clone().at_vec(5), dVdq_cols[2].clone().at_vec(5), dVdq_cols[3].clone().at_vec(5), dVdq_cols[4].clone().at_vec(5), dVdq_cols[5].clone().at_vec(5)]
+        [dVdq_cols[0].at_vec(0), dVdq_cols[1].at_vec(0), dVdq_cols[2].at_vec(0), dVdq_cols[3].at_vec(0), dVdq_cols[4].at_vec(0), dVdq_cols[5].at_vec(0)],
+        [dVdq_cols[0].at_vec(1), dVdq_cols[1].at_vec(1), dVdq_cols[2].at_vec(1), dVdq_cols[3].at_vec(1), dVdq_cols[4].at_vec(1), dVdq_cols[5].at_vec(1)],
+        [dVdq_cols[0].at_vec(2), dVdq_cols[1].at_vec(2), dVdq_cols[2].at_vec(2), dVdq_cols[3].at_vec(2), dVdq_cols[4].at_vec(2), dVdq_cols[5].at_vec(2)],
+        [dVdq_cols[0].at_vec(3), dVdq_cols[1].at_vec(3), dVdq_cols[2].at_vec(3), dVdq_cols[3].at_vec(3), dVdq_cols[4].at_vec(3), dVdq_cols[5].at_vec(3)],
+        [dVdq_cols[0].at_vec(4), dVdq_cols[1].at_vec(4), dVdq_cols[2].at_vec(4), dVdq_cols[3].at_vec(4), dVdq_cols[4].at_vec(4), dVdq_cols[5].at_vec(4)],
+        [dVdq_cols[0].at_vec(5), dVdq_cols[1].at_vec(5), dVdq_cols[2].at_vec(5), dVdq_cols[3].at_vec(5), dVdq_cols[4].at_vec(5), dVdq_cols[5].at_vec(5)]
     ).define("dVdq");
 
     let dAdq = Matrix!(
-        [dAdq_cols[0].clone().at_vec(0), dAdq_cols[1].clone().at_vec(0), dAdq_cols[2].clone().at_vec(0), dAdq_cols[3].clone().at_vec(0), dAdq_cols[4].clone().at_vec(0), dAdq_cols[5].clone().at_vec(0)],
-        [dAdq_cols[0].clone().at_vec(1), dAdq_cols[1].clone().at_vec(1), dAdq_cols[2].clone().at_vec(1), dAdq_cols[3].clone().at_vec(1), dAdq_cols[4].clone().at_vec(1), dAdq_cols[5].clone().at_vec(1)],
-        [dAdq_cols[0].clone().at_vec(2), dAdq_cols[1].clone().at_vec(2), dAdq_cols[2].clone().at_vec(2), dAdq_cols[3].clone().at_vec(2), dAdq_cols[4].clone().at_vec(2), dAdq_cols[5].clone().at_vec(2)],
-        [dAdq_cols[0].clone().at_vec(3), dAdq_cols[1].clone().at_vec(3), dAdq_cols[2].clone().at_vec(3), dAdq_cols[3].clone().at_vec(3), dAdq_cols[4].clone().at_vec(3), dAdq_cols[5].clone().at_vec(3)],
-        [dAdq_cols[0].clone().at_vec(4), dAdq_cols[1].clone().at_vec(4), dAdq_cols[2].clone().at_vec(4), dAdq_cols[3].clone().at_vec(4), dAdq_cols[4].clone().at_vec(4), dAdq_cols[5].clone().at_vec(4)],
-        [dAdq_cols[0].clone().at_vec(5), dAdq_cols[1].clone().at_vec(5), dAdq_cols[2].clone().at_vec(5), dAdq_cols[3].clone().at_vec(5), dAdq_cols[4].clone().at_vec(5), dAdq_cols[5].clone().at_vec(5)]
+        [dAdq_cols[0].at_vec(0), dAdq_cols[1].at_vec(0), dAdq_cols[2].at_vec(0), dAdq_cols[3].at_vec(0), dAdq_cols[4].at_vec(0), dAdq_cols[5].at_vec(0)],
+        [dAdq_cols[0].at_vec(1), dAdq_cols[1].at_vec(1), dAdq_cols[2].at_vec(1), dAdq_cols[3].at_vec(1), dAdq_cols[4].at_vec(1), dAdq_cols[5].at_vec(1)],
+        [dAdq_cols[0].at_vec(2), dAdq_cols[1].at_vec(2), dAdq_cols[2].at_vec(2), dAdq_cols[3].at_vec(2), dAdq_cols[4].at_vec(2), dAdq_cols[5].at_vec(2)],
+        [dAdq_cols[0].at_vec(3), dAdq_cols[1].at_vec(3), dAdq_cols[2].at_vec(3), dAdq_cols[3].at_vec(3), dAdq_cols[4].at_vec(3), dAdq_cols[5].at_vec(3)],
+        [dAdq_cols[0].at_vec(4), dAdq_cols[1].at_vec(4), dAdq_cols[2].at_vec(4), dAdq_cols[3].at_vec(4), dAdq_cols[4].at_vec(4), dAdq_cols[5].at_vec(4)],
+        [dAdq_cols[0].at_vec(5), dAdq_cols[1].at_vec(5), dAdq_cols[2].at_vec(5), dAdq_cols[3].at_vec(5), dAdq_cols[4].at_vec(5), dAdq_cols[5].at_vec(5)]
     ).define("dAdq");
 
     let dAdv = Matrix!(
-        [dAdv_cols[0].clone().at_vec(0), dAdv_cols[1].clone().at_vec(0), dAdv_cols[2].clone().at_vec(0), dAdv_cols[3].clone().at_vec(0), dAdv_cols[4].clone().at_vec(0), dAdv_cols[5].clone().at_vec(0)],
-        [dAdv_cols[0].clone().at_vec(1), dAdv_cols[1].clone().at_vec(1), dAdv_cols[2].clone().at_vec(1), dAdv_cols[3].clone().at_vec(1), dAdv_cols[4].clone().at_vec(1), dAdv_cols[5].clone().at_vec(1)],
-        [dAdv_cols[0].clone().at_vec(2), dAdv_cols[1].clone().at_vec(2), dAdv_cols[2].clone().at_vec(2), dAdv_cols[3].clone().at_vec(2), dAdv_cols[4].clone().at_vec(2), dAdv_cols[5].clone().at_vec(2)],
-        [dAdv_cols[0].clone().at_vec(3), dAdv_cols[1].clone().at_vec(3), dAdv_cols[2].clone().at_vec(3), dAdv_cols[3].clone().at_vec(3), dAdv_cols[4].clone().at_vec(3), dAdv_cols[5].clone().at_vec(3)],
-        [dAdv_cols[0].clone().at_vec(4), dAdv_cols[1].clone().at_vec(4), dAdv_cols[2].clone().at_vec(4), dAdv_cols[3].clone().at_vec(4), dAdv_cols[4].clone().at_vec(4), dAdv_cols[5].clone().at_vec(4)],
-        [dAdv_cols[0].clone().at_vec(5), dAdv_cols[1].clone().at_vec(5), dAdv_cols[2].clone().at_vec(5), dAdv_cols[3].clone().at_vec(5), dAdv_cols[4].clone().at_vec(5), dAdv_cols[5].clone().at_vec(5)]
+        [dAdv_cols[0].at_vec(0), dAdv_cols[1].at_vec(0), dAdv_cols[2].at_vec(0), dAdv_cols[3].at_vec(0), dAdv_cols[4].at_vec(0), dAdv_cols[5].at_vec(0)],
+        [dAdv_cols[0].at_vec(1), dAdv_cols[1].at_vec(1), dAdv_cols[2].at_vec(1), dAdv_cols[3].at_vec(1), dAdv_cols[4].at_vec(1), dAdv_cols[5].at_vec(1)],
+        [dAdv_cols[0].at_vec(2), dAdv_cols[1].at_vec(2), dAdv_cols[2].at_vec(2), dAdv_cols[3].at_vec(2), dAdv_cols[4].at_vec(2), dAdv_cols[5].at_vec(2)],
+        [dAdv_cols[0].at_vec(3), dAdv_cols[1].at_vec(3), dAdv_cols[2].at_vec(3), dAdv_cols[3].at_vec(3), dAdv_cols[4].at_vec(3), dAdv_cols[5].at_vec(3)],
+        [dAdv_cols[0].at_vec(4), dAdv_cols[1].at_vec(4), dAdv_cols[2].at_vec(4), dAdv_cols[3].at_vec(4), dAdv_cols[4].at_vec(4), dAdv_cols[5].at_vec(4)],
+        [dAdv_cols[0].at_vec(5), dAdv_cols[1].at_vec(5), dAdv_cols[2].at_vec(5), dAdv_cols[3].at_vec(5), dAdv_cols[4].at_vec(5), dAdv_cols[5].at_vec(5)]
     ).define("dAdv");
 
 
