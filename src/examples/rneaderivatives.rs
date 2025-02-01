@@ -193,7 +193,7 @@ fn alpha_skew_square(m: &ASTNode, v: &ASTNode) -> ASTNode {
 //      return res;
 //    }
 // rotation is inertia(), and translation is lever()
-fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode, angular: &ASTNode, mass: &ASTNode) -> ASTNode {
+fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode, angular: &ASTNode, mass: &ASTNode, joint_id: usize) -> ASTNode {
     let mv_linear = Vector!(
         linear.clone().at_vec(0) * mass.clone(),
         linear.clone().at_vec(1) * mass.clone(),
@@ -218,12 +218,12 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
     //      res.template block<3,3>(ANGULAR,ANGULAR) = -skewSquare(mv.linear(),lever()) - skewSquare(lever(),mv.linear());
     let skew_second_first = skew_square(&mv_linear, translation);
     let skew_second_second = skew_square(translation, &mv_linear);
-    let skew_second_second_neg = Matrix!(
+    let skew_second_first_neg = Matrix!(
         [-skew_second_first.clone().at_mat(0, 0), -skew_second_first.clone().at_mat(0, 1), -skew_second_first.clone().at_mat(0, 2)],
         [-skew_second_first.clone().at_mat(1, 0), -skew_second_first.clone().at_mat(1, 1), -skew_second_first.clone().at_mat(1, 2)],
         [-skew_second_first.clone().at_mat(2, 0), -skew_second_first.clone().at_mat(2, 1), -skew_second_first.clone().at_mat(2, 2)]
     ).define("skew_second_second_neg");
-    let res_second = (skew_second_second_neg - skew_second_first).define("res_second");
+    let res_second = (skew_second_first_neg - skew_second_second).define("res_second");
 
     //      res.template block<3,3>(LINEAR,LINEAR) = (inertia() - AlphaSkewSquare(mass(),lever())).matrix();
     let res_third = (rotation.clone() - alpha_skew_square(mass, translation)).define("res_third");
@@ -272,7 +272,7 @@ fn inertia_variation(rotation: &ASTNode, translation: &ASTNode, linear: &ASTNode
         [res_first.clone().at_mat(0, 0), res_first.clone().at_mat(1, 0), res_first.clone().at_mat(2, 0), res_sixth.clone().at_mat(0, 0), res_sixth.clone().at_mat(0, 1), res_sixth.clone().at_mat(0, 2)],
         [res_first.clone().at_mat(0, 1), res_first.clone().at_mat(1, 1), res_first.clone().at_mat(2, 1), res_sixth.clone().at_mat(1, 0), res_sixth.clone().at_mat(1, 1), res_sixth.clone().at_mat(1, 2)],
         [res_first.clone().at_mat(0, 2), res_first.clone().at_mat(1, 2), res_first.clone().at_mat(2, 2), res_sixth.clone().at_mat(2, 0), res_sixth.clone().at_mat(2, 1), res_sixth.clone().at_mat(2, 2)]
-    ).define("res_inertia_variation");
+    ).define(format!("inertia_variation_{}", joint_id).as_str());
 
     res_inertia_variation
 }
@@ -333,7 +333,7 @@ fn add_skew(m: &ASTNode, v: &ASTNode) -> ASTNode {
 ///   addSkew(-f.linear(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::LINEAR));
 ///   addSkew(-f.angular(),mout_.template block<3,3>(ForceDerived::ANGULAR,ForceDerived::ANGULAR));
 /// }
-fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNode) -> ASTNode {
+fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNode, joint_id: usize) -> ASTNode {
     // the linear linear part will stay the same
     let linear_angular = Matrix!(
         [mout.clone().at_mat(0, 3), mout.clone().at_mat(0, 4), mout.clone().at_mat(0, 5)],
@@ -375,7 +375,7 @@ fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNod
         [res_angular_linear.clone().at_mat(0, 0), res_angular_linear.clone().at_mat(0, 1), res_angular_linear.clone().at_mat(0, 2), res_angular_angular.clone().at_mat(0, 0), res_angular_angular.clone().at_mat(0, 1), res_angular_angular.clone().at_mat(0, 2)],
         [res_angular_linear.clone().at_mat(1, 0), res_angular_linear.clone().at_mat(1, 1), res_angular_linear.clone().at_mat(1, 2), res_angular_angular.clone().at_mat(1, 0), res_angular_angular.clone().at_mat(1, 1), res_angular_angular.clone().at_mat(1, 2)],
         [res_angular_linear.clone().at_mat(2, 0), res_angular_linear.clone().at_mat(2, 1), res_angular_linear.clone().at_mat(2, 2), res_angular_angular.clone().at_mat(2, 0), res_angular_angular.clone().at_mat(2, 1), res_angular_angular.clone().at_mat(2, 2)]
-    ).define("add_force_cross_matrix")
+    ).define(format!("add_force_cross_matrix_{joint_id}").as_str())
     
 
     
@@ -400,90 +400,85 @@ fn add_force_cross_matrix(f_linear: &ASTNode, f_angular: &ASTNode, mout: &ASTNod
 //  std::cout << "res: " << res << std::endl;
 //  return res;
 //}
-fn act_constraint(rotation: &ASTNode, translation: &ASTNode) -> (ASTNode, ASTNode) {
+fn act_constraint(rotation: &ASTNode, translation: &ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
     let rotation_col = Vector!(
         rotation.clone().at_mat(0, 2),
         rotation.clone().at_mat(1, 2),
         rotation.clone().at_mat(2, 2)
-    ).define("act_constraint_rotation_col");
+    ).define(format!("act_constraint_rotation_col_{}", joint_id).as_str());
 
-    let linear = (translation.clone().cross(rotation_col.clone())).define("act_constraint_linear");
+    let linear = (translation.clone().cross(rotation_col.clone())).define(format!("act_constraint_linear_{}", joint_id).as_str());
 
     (linear, rotation_col)
 }
 
 // not to be confused with motionAction. 
-// in C++, pinocchio/include/pinocchio/spatial/force-dense.hpp:
-// f.linear().noalias() = m.rotation()*linear();
-// f.angular().noalias() = m.rotation()*angular();
-// f.angular() += m.translation().cross(f.linear());
-fn act_motion(
-    rotation: ASTNode, 
-    translation: ASTNode, 
-    f: ASTNode, 
-    joint_id: usize
-) -> ASTNode {
-
-    let f_linear = Vector!(
-        f.clone().at_vec(0),
-        f.clone().at_vec(1),
-        f.clone().at_vec(2)
-    ).define(format!("f_linear_{}", joint_id).as_str());
-    let f_angular = Vector!(
-        f.clone().at_vec(3),
-        f.clone().at_vec(4),
-        f.clone().at_vec(5)
-    ).define(format!("f_angular_{}", joint_id).as_str());
-
-    let new_f_linear = (rotation.clone().cross(f_linear.clone())).define(format!("new_f_linear_{}", joint_id).as_str());
-    let new_f_angular = (rotation.clone().cross(f_angular.clone())).define(format!("new_f_angular_temp_{}", joint_id).as_str());
-
-    let f_angular_cross = translation.clone().cross(new_f_linear.clone()).define(format!("f_angular_cross_{}", joint_id).as_str());
-
-    let new_f_angular = (new_f_angular.clone() + f_angular_cross.clone()).define(format!("new_f_angular_{}", joint_id).as_str());
-
-    let new_f = Vector!(
-        new_f_linear.clone().at_vec(0),
-        new_f_linear.clone().at_vec(1),
-        new_f_linear.clone().at_vec(2),
-        new_f_angular.clone().at_vec(0),
-        new_f_angular.clone().at_vec(1),
-        new_f_angular.clone().at_vec(2)
-    ).define(format!("new_f_{}", joint_id).as_str());
-
-    new_f
-}
-
-// not to be confused with motionAction. 
-// in C++, pinocchio/include/pinocchio/spatial/force-dense.hpp:
-// f.linear().noalias() = m.rotation()*linear();
-// f.angular().noalias() = m.rotation()*angular();
-// f.angular() += m.translation().cross(f.linear());
+//      v.angular().noalias() = m.rotation()*angular();
+//      v.linear().noalias() = m.rotation()*linear() + m.translation().cross(v.angular());
 fn act_motion1(
     rotation: ASTNode, 
     translation: ASTNode, 
-    f_linear: ASTNode, 
-    f_angular: ASTNode, 
+    linear: ASTNode, 
+    angular: ASTNode, 
     joint_id: usize
 ) -> ASTNode {
 
-    let new_f_linear = (rotation.clone().cross(f_linear.clone())).define(format!("new_f_linear_{}", joint_id).as_str());
-    let new_f_angular = (rotation.clone().cross(f_angular.clone())).define(format!("new_f_angular_temp_{}", joint_id).as_str());
+    let rotation_crosss_linear = (rotation.clone().cross(linear.clone())).define(format!("motion_act_linear_{}", joint_id).as_str());
+    let rotation_cross_angular = (rotation.clone().cross(angular.clone())).define(format!("motion_act_angular_{}", joint_id).as_str());
 
-    let f_angular_cross = translation.clone().cross(new_f_linear.clone()).define(format!("f_angular_cross_{}", joint_id).as_str());
+    let res_angular = rotation_cross_angular.clone();
 
-    let new_f_angular = (new_f_angular.clone() + f_angular_cross.clone()).define(format!("new_f_angular_{}", joint_id).as_str());
+    let cross = translation.clone().cross(res_angular.clone()).define(format!("motion_act_cross_{}", joint_id).as_str());
+    let res_linear = (rotation_crosss_linear.clone() + cross.clone()).define(format!("motion_act_linear2_{}", joint_id).as_str());
 
-    let new_f = Vector!(
-        new_f_linear.clone().at_vec(0),
-        new_f_linear.clone().at_vec(1),
-        new_f_linear.clone().at_vec(2),
-        new_f_angular.clone().at_vec(0),
-        new_f_angular.clone().at_vec(1),
-        new_f_angular.clone().at_vec(2)
-    ).define(format!("new_f_{}", joint_id).as_str());
+    Vector!(
+        res_linear.clone().at_vec(0),
+        res_linear.clone().at_vec(1),
+        res_linear.clone().at_vec(2),
+        res_angular.clone().at_vec(0),
+        res_angular.clone().at_vec(1),
+        res_angular.clone().at_vec(2)
+    ).define(format!("act_motion_res_{}", joint_id).as_str())
+}
 
-    new_f
+// not to be confused with motionAction. 
+// in C++, pinocchio/include/pinocchio/spatial/motion-dense.hpp:
+//      v.angular().noalias() = m.rotation()*angular();
+//      v.linear().noalias() = m.rotation()*linear() + m.translation().cross(v.angular());
+fn act_motion(
+    rotation: ASTNode, 
+    translation: ASTNode, 
+    t: ASTNode, 
+    joint_id: usize
+) -> ASTNode {
+
+    let linear = Vector!(
+        t.clone().at_vec(0),
+        t.clone().at_vec(1),
+        t.clone().at_vec(2)
+    ).define(format!("t_linear_{}", joint_id).as_str());
+    let angular = Vector!(
+        t.clone().at_vec(3),
+        t.clone().at_vec(4),
+        t.clone().at_vec(5)
+    ).define(format!("t_angular_{}", joint_id).as_str());
+
+    let rotation_crosss_linear = (rotation.clone().cross(linear.clone())).define(format!("motion_act_linear_{}", joint_id).as_str());
+    let rotation_cross_angular = (rotation.clone().cross(angular.clone())).define(format!("motion_act_angular_{}", joint_id).as_str());
+
+    let res_angular = rotation_cross_angular.clone();
+
+    let cross = translation.clone().cross(res_angular.clone()).define(format!("motion_act_cross_{}", joint_id).as_str());
+    let res_linear = (rotation_crosss_linear.clone() + cross.clone()).define(format!("motion_act_linear2_{}", joint_id).as_str());
+
+    Vector!(
+        res_linear.clone().at_vec(0),
+        res_linear.clone().at_vec(1),
+        res_linear.clone().at_vec(2),
+        res_angular.clone().at_vec(0),
+        res_angular.clone().at_vec(1),
+        res_angular.clone().at_vec(2)
+    ).define(format!("act_motion_res_{}", joint_id).as_str())
 }
 
 // I strongly disagree with this function's name, but it is actInv in pinocchio,
@@ -689,6 +684,12 @@ fn first_pass(
     all_oa: &mut Vec<ASTNode>,
     all_oa_gf: &mut Vec<ASTNode>,
     all_a: &mut Vec<ASTNode>,
+    all_oycrb: &mut Vec<ASTNode>,
+    j_cols: &mut Vec<ASTNode>,
+    dj_cols: &mut Vec<ASTNode>,
+    dAdq_cols: &mut Vec<ASTNode>,
+    dAdv_cols: &mut Vec<ASTNode>,
+    dVdq_cols: &mut Vec<ASTNode>,
 ) {
 
     let rotation_matrix = Matrix!(
@@ -807,9 +808,18 @@ fn first_pass(
         alpha_cross_angular.clone().at_vec(0),
         alpha_cross_angular.clone().at_vec(1),
         a.clone().at_vec(joint_id)
-    ).define(format!("new_data_a{}", joint_id).as_str());
+    ).define(format!("new_data_a_{}", joint_id).as_str());
 
-    all_a.push(new_data_a.clone());
+    let temp_a_linear = Vector!(
+        new_data_a.clone().at_vec(0),
+        new_data_a.clone().at_vec(1),
+        new_data_a.clone().at_vec(2)
+    ).define(format!("temp_a_linear_{}", joint_id).as_str());
+    let temp_a_angular = Vector!(
+        new_data_a.clone().at_vec(3),
+        new_data_a.clone().at_vec(4),
+        new_data_a.clone().at_vec(5)
+    ).define(format!("temp_a_angular_{}", joint_id).as_str());
 
     //if(parent > 0)
     //  {
@@ -819,26 +829,29 @@ fn first_pass(
     match joint_id {
         0 => (),
         _ => {
-            let limi_actInv_a_parent = act_motion_inv(&limi_translation, &limi_rotation, &alpha_cross_linear, &alpha_cross_angular, parent_a_linear, parent_a_angular, joint_id);
+            let limi_actInv_a_parent = act_motion_inv(&limi_translation, &limi_rotation, &temp_a_linear, &temp_a_angular, parent_a_linear, parent_a_angular, joint_id);
     
-            let new_data_a_addition = Vector!(
+            new_data_a = Vector!(
                 limi_actInv_a_parent.0.clone().at_vec(0),
                 limi_actInv_a_parent.0.clone().at_vec(1),
                 limi_actInv_a_parent.0.clone().at_vec(2),
                 limi_actInv_a_parent.1.clone().at_vec(0),
                 limi_actInv_a_parent.1.clone().at_vec(1),
                 limi_actInv_a_parent.1.clone().at_vec(2)
-            ).define(format!("new_data_a_addition_{}", joint_id).as_str());
-        
-            new_data_a = (new_data_a.clone() + new_data_a_addition).define(format!("new_data_a2_{}", joint_id).as_str());        
+            ).define(format!("a_final_{}", joint_id).as_str());
+             
         }
     }
+
+    all_a.push(new_data_a.clone());
 
     // all of these act functions are different than rnea.rs
     // data.oYcrb[i] = data.oinertias[i] = data.oMi[i].act(model.inertias[i]);
     let (data_oycrb_trans_i, data_oycrb_rot_i) = act_inertia(&oMis[joint_id].0, &oMis[joint_id].1, masses, &levers[joint_id], &inertias[joint_id]);
     let data_oinertias_trans_i = data_oycrb_trans_i.clone().define(format!("data_oinertias_trans_{}", joint_id).as_str());
     let data_oinertias_rot_i = data_oycrb_rot_i.clone().define(format!("data_oinertias_rot_{}", joint_id).as_str());
+
+    all_oycrb.push(data_oinertias_rot_i);
 
     // ov = data.oMi[i].act(data.v[i]);
     let ov = act_motion1(oMis[joint_id].0.clone(), oMis[joint_id].1.clone(), new_v_linear.clone(), new_v_angular.clone(), joint_id).define(format!("ov_{}", joint_id).as_str());
@@ -946,15 +959,35 @@ fn first_pass(
         data_of_angular.clone().at_vec(1),
         data_of_angular.clone().at_vec(2)
     ).define(format!("all_of_{}", joint_id).as_str()));
+    // Correct until here
     
     // J_cols = data.oMi[i].act(jdata.S());
     // S is ConstraintRevoluteTpl, and this function can be found in:
     // include/pinocchio/multibody/joint/joint-revolute.hpp, ConstraintRevoluteTpl::se3Action
-    let (J_cols_linear, J_cols_angular) = act_constraint(&oMis[joint_id].0, &oMis[joint_id].1);
+    let (J_cols_linear, J_cols_angular) = act_constraint(&oMis[joint_id].0, &oMis[joint_id].1, joint_id);
+
+    // push to j_cols
+    j_cols.push(Vector!(
+        J_cols_linear.clone().at_vec(0),
+        J_cols_linear.clone().at_vec(1),
+        J_cols_linear.clone().at_vec(2),
+        J_cols_angular.clone().at_vec(0),
+        J_cols_angular.clone().at_vec(1),
+        J_cols_angular.clone().at_vec(2)
+    ).define(format!("j_cols_{}", joint_id).as_str()));
     
     //motionSet::motionAction(ov,J_cols,dJ_cols);
     let (dJ_cols_linear, dJ_cols_angular) = motionAction(&ov_linear, &ov_angular, &J_cols_linear, &J_cols_angular, joint_id);
-    
+
+    dj_cols.push(Vector!(
+        dJ_cols_linear.clone().at_vec(0),
+        dJ_cols_linear.clone().at_vec(1),
+        dJ_cols_linear.clone().at_vec(2),
+        dJ_cols_angular.clone().at_vec(0),
+        dJ_cols_angular.clone().at_vec(1),
+        dJ_cols_angular.clone().at_vec(2)
+    ).define(format!("dj_cols_{}", joint_id).as_str()));
+
     
     // joint_id is one more than what it actually should be, so in parent for oa_gfs I should check joint_id for parent
     let oa_gf_parent_linear = match joint_id {
@@ -966,7 +999,7 @@ fn first_pass(
         ).define(format!("oa_gf_parent_linear_{}", joint_id).as_str())
     };
     let oa_gf_parent_angular = match joint_id {
-        0 => Vector!(0.0, 0.0, -9.81).define(format!("oa_gf_parent_angular_{}", joint_id).as_str()), // first oa_gf is gravity, it is hardcoded in pinocchio
+        0 => Vector!(0.0, 0.0, 9.81).define(format!("oa_gf_parent_angular_{}", joint_id).as_str()), // first oa_gf is gravity, it is hardcoded in pinocchio
         _ => Vector!(
             all_oa_gf[joint_id - 1].clone().at_vec(3),
             all_oa_gf[joint_id - 1].clone().at_vec(4),
@@ -976,7 +1009,7 @@ fn first_pass(
 
     //motionSet::motionAction(data.oa_gf[parent],J_cols,dAdq_cols);
     let (mut dAdq_cols_linear, mut dAdq_cols_angular) = motionAction(&oa_gf_parent_linear, &oa_gf_parent_angular, &J_cols_linear, &J_cols_angular, joint_id);
-    
+
     // dAdv_cols = dJ_cols;
     let mut dAdv_cols_linear = dJ_cols_linear.clone().define(format!("dAdv_cols_linear_{}", joint_id).as_str());
     let mut dAdv_cols_angular = dJ_cols_angular.clone().define(format!("dAdv_cols_angular_{}", joint_id).as_str());
@@ -1034,19 +1067,44 @@ fn first_pass(
         }
     };
 
+    dAdq_cols.push(Vector!(
+        dAdq_cols_linear.clone().at_vec(0),
+        dAdq_cols_linear.clone().at_vec(1),
+        dAdq_cols_linear.clone().at_vec(2),
+        dAdq_cols_angular.clone().at_vec(0),
+        dAdq_cols_angular.clone().at_vec(1),
+        dAdq_cols_angular.clone().at_vec(2)
+    ).define(format!("dAdq_cols_{}", joint_id).as_str()));
+
+    dAdv_cols.push(Vector!(
+        dAdv_cols_linear.clone().at_vec(0),
+        dAdv_cols_linear.clone().at_vec(1),
+        dAdv_cols_linear.clone().at_vec(2),
+        dAdv_cols_angular.clone().at_vec(0),
+        dAdv_cols_angular.clone().at_vec(1),
+        dAdv_cols_angular.clone().at_vec(2)
+    ).define(format!("dAdv_cols_{}", joint_id).as_str()));
+
+    dVdq_cols.push(Vector!(
+        dvdq_cols_linear.clone().at_vec(0),
+        dvdq_cols_linear.clone().at_vec(1),
+        dvdq_cols_linear.clone().at_vec(2),
+        dvdq_cols_angular.clone().at_vec(0),
+        dvdq_cols_angular.clone().at_vec(1),
+        dvdq_cols_angular.clone().at_vec(2)
+    ).define(format!("dVdq_cols_{}", joint_id).as_str()));
+
     
     //// computes variation of inertias
     //data.doYcrb[i] = data.oYcrb[i].variation(ov);
     //
     //addForceCrossMatrix(data.oh[i],data.doYcrb[i]);
     
-    let data_doycrb_i = inertia_variation(&data_oycrb_rot_i.clone(), &data_oycrb_trans_i.clone(), &ov_linear, &ov_angular, &masses.clone().at_vec(joint_id));
+    let data_doycrb_i = inertia_variation(&data_oycrb_rot_i.clone(), &data_oycrb_trans_i.clone(), &ov_linear, &ov_angular, &masses.clone().at_vec(joint_id), joint_id);
     
-    let data_doycrb_i = add_force_cross_matrix(&data_oh_linear.clone(), &data_oh_angular.clone(), &data_doycrb_i.clone());
+    let data_doycrb_i = add_force_cross_matrix(&data_oh_linear.clone(), &data_oh_angular.clone(), &data_doycrb_i.clone(), joint_id);
 
     all_doycrb.push(data_doycrb_i.clone());
-
-    //(limi_rotations, new_v, new_a_gf_up3, h, f)
 }
 
 
@@ -1151,6 +1209,12 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     let mut all_oa: Vec<ASTNode> = vec![];
     let mut all_oa_gf: Vec<ASTNode> = vec![];
     let mut all_a: Vec<ASTNode> = vec![];
+    let mut all_oycrb: Vec<ASTNode> = vec![];
+    let mut j_cols: Vec<ASTNode> = vec![];
+    let mut dj_cols: Vec<ASTNode> = vec![];
+    let mut dAdq_cols: Vec<ASTNode> = vec![];
+    let mut dAdv_cols: Vec<ASTNode> = vec![];
+    let mut dVdq_cols: Vec<ASTNode> = vec![];
 
     //data.oa_gf[0] = -model.gravity;
     let data_oa_gf = Vector!(0.0, 0.0, 9.81, 0.0, 0.0, 0.0).define("parent_oa_gf");
@@ -1164,10 +1228,6 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
     let mut oMis: Vec<(ASTNode, ASTNode)> = Vec::new();
     let mut oa_gfs: Vec<ASTNode> = Vec::new();
     oa_gfs.push(data_oa_gf.clone());
-    // rest of the oa_gfs are just 0, I don't know why
-    for i in 0..n_joints {
-        oa_gfs.push(Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define(format!("oa_gf_{}", i).as_str()));
-    }
 
     // first pass, it takes model.joints[i], data.joints[i], model, data, q, v, a
     for i in 0..n_joints {
@@ -1193,13 +1253,23 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
             &mut all_oa,
             &mut all_oa_gf,
             &mut all_a,
+            &mut all_oycrb,
+            &mut j_cols,
+            &mut dj_cols,
+            &mut dAdq_cols,
+            &mut dAdv_cols,
+            &mut dVdq_cols
         );
     }
 
-    // sec_pass will do its own iteration
-    //let (new_f, taus) = sec_pass(all_f, limi_rotations, &limi_translations, n_joints);
+    // merge j_cols to J
+    // merge dj_cols to dJ
 
-    //taus
+
+
+
+
+    
 
 }
 
