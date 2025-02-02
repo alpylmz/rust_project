@@ -132,6 +132,16 @@ impl<'a> Add<&'a ASTNode> for ASTNode {
     }
 }
 
+// Now, implement Add for &mut ASTNode by reborrowing as &ASTNode.
+impl<'a, 'b> Add<&'b ASTNode> for &'a mut ASTNode {
+    type Output = ASTNode;
+
+    fn add(self, rhs: &'b ASTNode) -> ASTNode {
+        // Reborrow self as an immutable reference
+        (&*self) + rhs
+    }
+}
+
 // &ASTNode + ASTNode
 impl<'a> Sub<ASTNode> for &'a ASTNode {
     type Output = ASTNode;
@@ -472,6 +482,10 @@ impl ASTNode {
                 }
                 else {
                     let all_vars = ALL_VARS.lock().unwrap();
+                    eprintln!("lhs: {:?}", lhs);
+                    eprintln!("rhs: {:?}", rhs);
+                    eprintln!("lhs type: {:?}", lhs.get_type());
+                    eprintln!("rhs type: {:?}", rhs.get_type());
                     panic!("Addition/Subtraction of different types, {} and {} is not allowed in this context {:?}", lhs, rhs, all_vars);
                 }
             }
