@@ -2,8 +2,9 @@
 
 use std::fmt;
 use crate::helper::{add_var_name, get_new_name, search_var_name, VarType, add_var, get_size, ALL_VARS};
-use std::ops::{Add, Mul, Neg, Sub};
+use std::ops::{Add, Mul, Neg, Sub, Div};
 use crate::config::UNROLL;
+use std::io::Write;
 
 
 
@@ -18,7 +19,9 @@ pub enum ASTNode {
     Add(Box<ASTNode>, Box<ASTNode>),
     Sub(Box<ASTNode>, Box<ASTNode>),
     Mul(Box<ASTNode>, Box<ASTNode>),
+    Div(Box<ASTNode>, Box<ASTNode>),
     Cross(Box<ASTNode>, Box<ASTNode>),
+    Dot(Box<ASTNode>, Box<ASTNode>),
     Transpose(Box<ASTNode>),
     AtVec(Box<ASTNode>, usize),
     AtMat(Box<ASTNode>, usize, usize),
@@ -58,6 +61,14 @@ impl Mul for ASTNode {
         ASTNode::Mul(Box::new(self), Box::new(rhs))
     }
 }
+
+impl Div for ASTNode {
+    type Output = ASTNode;
+    fn div(self, rhs: ASTNode) -> ASTNode {
+        ASTNode::Div(Box::new(self), Box::new(rhs))
+    }
+}
+
 impl Neg for ASTNode {
     type Output = ASTNode;
     fn neg(self) -> ASTNode {
@@ -99,21 +110,136 @@ macro_rules! Matrix {
     };
 }
 
+// add for references
+impl<'a, 'b> Add<&'b ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn add(self, rhs: &'b ASTNode) -> ASTNode {
+        ASTNode::Add(Box::new(self.clone()), Box::new(rhs.clone()))
+    }
+}
+// add for one ref
+impl<'a> Add<ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn add(self, rhs: ASTNode) -> ASTNode {
+        ASTNode::Add(Box::new(self.clone()), Box::new(rhs))
+    }
+}
+// add for the other ref
+impl<'a> Add<&'a ASTNode> for ASTNode {
+    type Output = ASTNode;
+    fn add(self, rhs: &'a ASTNode) -> ASTNode {
+        ASTNode::Add(Box::new(self), Box::new(rhs.clone()))
+    }
+}
+
+// &ASTNode + ASTNode
+impl<'a> Sub<ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn sub(self, rhs: ASTNode) -> ASTNode {
+        self.clone() - rhs
+    }
+}
+
+// ASTNode + &ASTNode
+impl<'b> Sub<&'b ASTNode> for ASTNode {
+    type Output = ASTNode;
+    fn sub(self, rhs: &'b ASTNode) -> ASTNode {
+        self - rhs.clone()
+    }
+}
+
+// &ASTNode + &ASTNode
+impl<'a, 'b> Sub<&'b ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn sub(self, rhs: &'b ASTNode) -> ASTNode {
+        self.clone() - rhs.clone()
+    }
+}
+
+// ========================================
+// Multiplication implementations
+// ========================================
+
+// &ASTNode + ASTNode
+impl<'a> Mul<ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn mul(self, rhs: ASTNode) -> ASTNode {
+        self.clone() * rhs
+    }
+}
+
+// ASTNode + &ASTNode
+impl<'b> Mul<&'b ASTNode> for ASTNode {
+    type Output = ASTNode;
+    fn mul(self, rhs: &'b ASTNode) -> ASTNode {
+        self * rhs.clone()
+    }
+}
+
+// &ASTNode + &ASTNode
+impl<'a, 'b> Mul<&'b ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn mul(self, rhs: &'b ASTNode) -> ASTNode {
+        self.clone() * rhs.clone()
+    }
+}
+
+// ========================================
+// Division implementations
+// ========================================
+
+// &ASTNode + ASTNode
+impl<'a> Div<ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn div(self, rhs: ASTNode) -> ASTNode {
+        self.clone() / rhs
+    }
+}
+
+// ASTNode + &ASTNode
+impl<'b> Div<&'b ASTNode> for ASTNode {
+    type Output = ASTNode;
+    fn div(self, rhs: &'b ASTNode) -> ASTNode {
+        self / rhs.clone()
+    }
+}
+
+// &ASTNode + &ASTNode
+impl<'a, 'b> Div<&'b ASTNode> for &'a ASTNode {
+    type Output = ASTNode;
+    fn div(self, rhs: &'b ASTNode) -> ASTNode {
+        self.clone() / rhs.clone()
+    }
+}
+
+impl<'a> Neg for &'a ASTNode {
+    type Output = ASTNode;
+    fn neg(self) -> ASTNode {
+        ASTNode::Neg(Box::new(self.clone()))
+    }
+}
+
+
+
 impl ASTNode {
-    pub fn at_vec(self, i: usize) -> ASTNode {
-        ASTNode::AtVec(Box::new(self), i)
+    pub fn at_vec(&self, i: usize) -> ASTNode {
+        ASTNode::AtVec(Box::new(self.clone()), i)
     }
 
-    pub fn cross(self, rhs: ASTNode) -> ASTNode {
-        ASTNode::Cross(Box::new(self), Box::new(rhs))
+    pub fn cross(&self, rhs: &ASTNode) -> ASTNode {
+        ASTNode::Cross(Box::new(self.clone()), Box::new(rhs.clone()))
     }
 
-    pub fn transpose(self) -> ASTNode {
-        ASTNode::Transpose(Box::new(self))
+    pub fn dot(&self, rhs: &ASTNode) -> ASTNode {
+        ASTNode::Dot(Box::new(self.clone()), Box::new(rhs.clone()))
     }
 
-    pub fn at_mat(self, r: usize, c: usize) -> ASTNode {
-        ASTNode::AtMat(Box::new(self), r, c)
+    pub fn transpose(&self) -> ASTNode {
+        ASTNode::Transpose(Box::new(self.clone()))
+    }
+
+    pub fn at_mat(&self, r: usize, c: usize) -> ASTNode {
+        ASTNode::AtMat(Box::new(self.clone()), r, c)
     }
 
     /// Infer the VarType from the node type.
@@ -160,11 +286,13 @@ impl ASTNode {
                 } else if child1_type == VarType::Matrix && child2_type == VarType::Vector {
                     VarType::Vector
                 } else {
-                    println!("Multype");
-                    println!("child1_type: {:?}", child1_type);
-                    println!("child2_type: {:?}", child2_type);
-                    println!("child1: {:?}", child1);
-                    println!("child2: {:?}", child2);
+                    eprintln!("Multype");
+                    eprintln!("child1_type: {:?}", child1_type);
+                    eprintln!("child2_type: {:?}", child2_type);
+                    eprintln!("child1: {:?}", child1);
+                    eprintln!("child2: {:?}", child2);
+                    // flush stdout
+                    std::io::stdout().flush().unwrap();
                     panic!("Multiplication of different types is not allowed in this context")
                 }
             }
@@ -189,6 +317,21 @@ impl ASTNode {
                     panic!("Subtraction of different types is not allowed in this context")
                 }
             }
+            ASTNode::Div(child1, child2) => {
+                // Division is the same as multiplication
+                let child1_type = child1.infer_type();
+                let child2_type = child2.infer_type();
+                if child1_type == VarType::Scalar && child2_type == VarType::Scalar {
+                    VarType::Scalar
+                } else {
+                    println!("Divtype");
+                    println!("child1_type: {:?}", child1_type);
+                    println!("child2_type: {:?}", child2_type);
+                    println!("child1: {:?}", child1);
+                    println!("child2: {:?}", child2);
+                    panic!("Division of different types is not allowed in this context")
+                }
+            }
             ASTNode::AtVec(_, _) => VarType::Scalar,
             ASTNode::AtMat(_, _, _) => VarType::Scalar,
             ASTNode::Neg(child) => child.infer_type(),
@@ -204,6 +347,15 @@ impl ASTNode {
                     VarType::Vector
                 } else {
                     panic!("Cross product of different types is not allowed in this context")
+                }
+            }
+            ASTNode::Dot(child1, child2) => {
+                let child1_type = child1.infer_type();
+                let child2_type = child2.infer_type();
+                if child1_type == VarType::Vector && child2_type == VarType::Vector {
+                    VarType::Scalar
+                } else {
+                    panic!("Dot product of different types is not allowed in this context")
                 }
             }
             ASTNode::Transpose(_) => VarType::Matrix,
@@ -321,6 +473,17 @@ impl ASTNode {
                 else {
                     let all_vars = ALL_VARS.lock().unwrap();
                     panic!("Addition/Subtraction of different types, {} and {} is not allowed in this context {:?}", lhs, rhs, all_vars);
+                }
+            }
+            "/" => {
+                if is_scalar(lhs) && is_scalar(rhs) {
+                    println!("val {} = {} {} {}", new_name, lhs, opr, rhs);
+                    add_var(&new_name, vec![1]);
+                    add_var_name(&new_name);
+                }
+                else{
+                    let all_vars = ALL_VARS.lock().unwrap();
+                    panic!("Division of {} and {} is not allowed in this context {:?}", lhs, rhs, all_vars);
                 }
             }
             "*" => { // element-wise multiplication
@@ -450,8 +613,8 @@ impl ASTNode {
                     let old_name = new_name;
                     let new_name = format!("{}_0", new_name);
                     // implement cross product manually
-                    // lhs_0 * rhs_1 - lhs_1 * rhs_0
-                    println!("val {} = {}_0 * {}_1 - {}_1 * {}_0", new_name, lhs, rhs, lhs, rhs);
+                    // lhs_1 * rhs_2 - lhs_2 * rhs_1
+                    println!("val {} = {}_1 * {}_2 - {}_2 * {}_1", new_name, lhs, rhs, lhs, rhs);
                     add_var(&new_name, vec![1]);
                     add_var_name(&new_name);
 
@@ -590,7 +753,7 @@ impl ASTNode {
                     }
                 }
             }
-            ASTNode::Add(lhs, rhs) => {
+            ASTNode::Add(ref lhs, ref rhs) => {
                 self.unroll_opr(lhs, rhs, new_name, "+");
             }
             ASTNode::Sub(lhs, rhs) => {
@@ -598,6 +761,9 @@ impl ASTNode {
             }
             ASTNode::Mul(lhs, rhs) => {
                 self.unroll_opr(lhs, rhs, new_name, "*");
+            }
+            ASTNode::Div(lhs, rhs) => {
+                self.unroll_opr(lhs, rhs, new_name, "/");
             }
             ASTNode::AtVec(base, i) => {
                 let new_name = format!("{}", new_name);
@@ -620,6 +786,28 @@ impl ASTNode {
             }
             ASTNode::Cross(lhs, rhs) => {
                 self.unroll_opr(lhs, rhs, new_name, "x");
+            }
+            ASTNode::Dot(lhs, rhs) => {
+                let size = get_size(&lhs.to_string());
+                let size2 = get_size(&rhs.to_string());
+                if size.len() != 1 {
+                    panic!("Vector length should have 1 dimension, for variable {} it has {}", lhs, size.len());
+                }
+                if size2.len() != 1 {
+                    panic!("Vector length should have 1 dimension, for variable {} it has {}", rhs, size2.len());
+                }
+                if size != size2 {
+                    panic!("Vectors should have the same size, for variable {} it has {:#?} and for variable {} it has {:#?}", lhs, size, rhs, size2);
+                }
+                add_var(&new_name, vec![1]);
+                let mut elements = Vec::new();
+                for i in 0..size[0] {
+                    let element = format!("{}_{}", lhs, i);
+                    let element2 = format!("{}_{}", rhs, i);
+                    elements.push(format!("{} * {}", element, element2));
+                }
+                println!("val {}: Real = {}", new_name, elements.join(" + "));
+                add_var_name(&new_name);
             }
             ASTNode::Transpose(child) => {
                 let new_name = format!("{}", new_name);
@@ -683,10 +871,12 @@ impl ASTNode {
             ASTNode::Add(_, _) => "Add".to_string(),
             ASTNode::Sub(_, _) => "Sub".to_string(),
             ASTNode::Mul(_, _) => "Mul".to_string(),
+            ASTNode::Div(_, _) => "Div".to_string(),
             ASTNode::AtVec(_, _) => "AtVec".to_string(),
             ASTNode::AtMat(_, _, _) => "AtMat".to_string(),
             ASTNode::Neg(_) => "Neg".to_string(),
             ASTNode::Cross(_, _) => "Cross".to_string(),
+            ASTNode::Dot(_, _) => "Dot".to_string(),
             ASTNode::Transpose(_) => "Transpose".to_string(),
         }
     }
@@ -703,6 +893,7 @@ fn is_scalar(node: &ASTNode) -> bool {
         ASTNode::Mul(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs), // needs better handling, dot product etc.
         ASTNode::Add(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs),
         ASTNode::Sub(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs),
+        ASTNode::Div(lhs, rhs) => is_scalar(lhs) && is_scalar(rhs),
         _ => false,
     }
 }
@@ -770,6 +961,7 @@ impl fmt::Display for ASTNode {
             }
             ASTNode::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
             ASTNode::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
+            ASTNode::Div(lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
             ASTNode::Mul(lhs, rhs) => {
                 if is_scalar(lhs) || is_scalar(rhs) {
                     // if one of them is not scalar, we need to write it like non_scalar * scalar
@@ -802,6 +994,7 @@ impl fmt::Display for ASTNode {
             }
             ASTNode::Neg(child) => write!(f, "(-{})", child),
             ASTNode::Cross(lhs, rhs) => write!(f, "{}.x({})", lhs, rhs),
+            ASTNode::Dot(lhs, rhs) => write!(f, "{}.dot({})", lhs, rhs),
             ASTNode::Transpose(child) => write!(f, "{}.transpose()", child),
         }
     }
