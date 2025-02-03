@@ -252,6 +252,32 @@ impl ASTNode {
         ASTNode::AtMat(Box::new(self.clone()), r, c)
     }
 
+    pub fn set_vec_at(&self, i: usize, value: ASTNode) -> ASTNode {
+        match self {
+            ASTNode::Vector(nodes) => {
+                let mut new_nodes = nodes.clone();
+                new_nodes[i] = value;
+                ASTNode::Vector(new_nodes)
+            }
+            _ => {
+                // print type
+                eprintln!("Type: {:?}", self.get_type());
+                panic!("set_at is only allowed for vectors");
+            }
+        }
+    }
+
+    pub fn set_mat_at(&self, i: usize, j: usize, value: ASTNode) -> ASTNode {
+        match self {
+            ASTNode::Matrix(rows) => {
+                let mut new_rows = rows.clone();
+                new_rows[i][j] = value;
+                ASTNode::Matrix(new_rows)
+            }
+            _ => panic!("set_at is only allowed for matrices"),
+        }
+    }
+
     /// Infer the VarType from the node type.
     fn infer_type(&self) -> VarType {
         match self {
@@ -354,6 +380,8 @@ impl ASTNode {
                 } else if child1_type == VarType::Matrix && child2_type == VarType::Matrix {
                     VarType::Matrix
                 } else if child1_type == VarType::Matrix && child2_type == VarType::Vector {
+                    VarType::Vector
+                } else if child1_type == VarType::Vector && child2_type == VarType::Matrix {
                     VarType::Vector
                 } else {
                     panic!("Cross product of different types is not allowed in this context")
@@ -685,6 +713,27 @@ impl ASTNode {
                         for k in 0..size1[1] {
                             let element = format!("{}_{}_{}", lhs, i, k);
                             let element2 = format!("{}_{}", rhs, k);
+                            elements.push(format!("{} * {}", element, element2));
+                        }
+                        println!("val {} = {}", new_name, elements.join(" + "));
+                        add_var(&new_name, vec![1]);
+                        add_var_name(&new_name);
+                    }
+                }
+                else if is_vector(lhs) && is_matrix(rhs) {
+                    // In this case you can assume that the vector is a row vector
+                    let size1 = get_size(&lhs.to_string());
+                    let size2 = get_size(&rhs.to_string());
+                    if size1[0] != size2[0] {
+                        panic!("Matrix multiplication is only allowed if the number of columns of the first matrix is equal to the number of rows of the second matrix");
+                    }
+                    add_var(&new_name, vec![size2[1]]);
+                    for i in 0..size2[1] {
+                        let new_name = format!("{}_{}", new_name, i);
+                        let mut elements = Vec::new();
+                        for k in 0..size1[0] {
+                            let element = format!("{}_{}", lhs, k);
+                            let element2 = format!("{}_{}_{}", rhs, k, i);
                             elements.push(format!("{} * {}", element, element2));
                         }
                         println!("val {} = {}", new_name, elements.join(" + "));
