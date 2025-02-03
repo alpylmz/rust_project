@@ -295,6 +295,57 @@ fn motionAction(v_linear: &ASTNode, v_angular: &ASTNode, linear: &ASTNode, angul
 }
 
 
+// the cross here is not the regular cross product since the vectors are 6D
+// it is implemented in pinocchio/include/pinocchio/spatial/motion-dense.hpp cross_impl, 
+// and it calls a motionAction, which is implemented in pinocchio/include/pinocchio/spatial/force-dense.hpp motionAction
+// final line is data.f[i] += data.v[i].cross(data.h[i]);
+/*
+void motionAction(const MotionDense<M1> & v, ForceDense<M2> & fout) const
+{
+    std::cout << "ForceDense::motionAction" << std::endl;
+    fout.linear().noalias() = v.angular().cross(linear());
+    fout.angular().noalias() = v.angular().cross(angular())+v.linear().cross(linear());
+}
+*/
+fn cross_6d(v1: &ASTNode, v2: &ASTNode) -> ASTNode {
+    let v1_linear = Vector!(
+        v1.at_vec(0),
+        v1.at_vec(1),
+        v1.at_vec(2)
+    ).define("v1_linear");
+    let v1_angular = Vector!(
+        v1.at_vec(3),
+        v1.at_vec(4),
+        v1.at_vec(5)
+    ).define("v1_angular");
+
+    let v2_linear = Vector!(
+        v2.at_vec(0),
+        v2.at_vec(1),
+        v2.at_vec(2)
+    ).define("v2_linear");
+    let v2_angular = Vector!(
+        v2.at_vec(3),
+        v2.at_vec(4),
+        v2.at_vec(5)
+    ).define("v2_angular");
+
+    let res_linear = (v1_angular.clone().cross(&v2_linear)).define("res_linear");
+    let res_angular_1 = (v1_angular.clone().cross(&v2_angular)).define("res_angular_1");
+    let res_angular_2 = (v1_linear.clone().cross(&v2_linear)).define("res_angular_2");
+    let res_angular = (res_angular_1 + res_angular_2).define("res_angular");
+
+    let res = Vector!(
+        res_linear.at_vec(0),
+        res_linear.at_vec(1),
+        res_linear.at_vec(2),
+        res_angular.at_vec(0),
+        res_angular.at_vec(1),
+        res_angular.at_vec(2)
+    ).define("cross_6d_res");
+
+    res
+}
 
 //  ///
 //  /// \brief Add skew matrix represented by a 3d vector to a given matrix,
@@ -1217,15 +1268,15 @@ fn add_inertia(
 }
 
 fn second_pass(
-    j_cols: ASTNode,
-    dVdq_cols: ASTNode,
-    dAdq_cols: ASTNode,
-    dAdv_cols: ASTNode,
+    j_cols_vec: &Vec<ASTNode>,
+    dVdq_cols: &Vec<ASTNode>,
+    dAdq_cols: &mut Vec<ASTNode>,
+    dAdv_cols: &mut Vec<ASTNode>,
     dFdq_cols: &mut Vec<ASTNode>,
     dFdv_cols: &mut Vec<ASTNode>,
     dFda_cols: &mut Vec<ASTNode>,
-    rnea_partial_dq: &mut ASTNode,
-    rnea_partial_dv: &mut Vec<ASTNode>,
+    rnea_partial_dq_rows: &mut Vec<ASTNode>,
+    rnea_partial_dv_rows: &mut Vec<ASTNode>,
     rnea_partial_da: &mut Vec<ASTNode>,
     of: &mut Vec<ASTNode>,
     taus: &mut Vec<ASTNode>,
@@ -1235,6 +1286,8 @@ fn second_pass(
     levers: &mut Vec<ASTNode>,
     joint_id: usize,
 ) {
+
+    let j_cols = j_cols_vec[joint_id].clone();
     //jmodel.jointVelocitySelector(data.tau).noalias() = J_cols.transpose()*data.of[i].toVector();
     let of_i = of[joint_id].clone();
     let of_parent = match joint_id {
@@ -1264,7 +1317,7 @@ fn second_pass(
             let new_doycrb = (all_doycrb[joint_id - 1].clone() + all_doycrb[joint_id].clone()).define(format!("new_doycrb_{}", joint_id - 1).as_str());
             all_doycrb[joint_id - 1] = new_doycrb;
 
-            of[joint_id - 1] = (of_parent + of_i).define(format!("of_parent_updated_{}", joint_id).as_str());
+            of[joint_id - 1] = (of_parent + &of_i).define(format!("of_parent_updated_{}", joint_id).as_str());
         }
     }
 
@@ -1299,7 +1352,7 @@ fn second_pass(
     // dFdv_cols.noalias() = data.doYcrb[i] * J_cols;
     let dFdv_cols_temp = doycrb_i.cross(&j_cols).define(format!("dFdv_cols_temp_{}", joint_id).as_str());
     // motionSet::inertiaAction<ADDTO>(data.oYcrb[i],dAdv_cols,dFdv_cols);
-    let dFdv_cols_temp2 = inertia_vec_mult(&masses[joint_id], &oycrb_i.1, &oycrb_i.0, &dAdv_cols, joint_id);
+    let dFdv_cols_temp2 = inertia_vec_mult(&masses[joint_id], &oycrb_i.1, &oycrb_i.0, &dAdv_cols[joint_id], joint_id);
     let dFdv_cols_final = (dFdv_cols_temp + dFdv_cols_temp2).define(format!("dFdv_cols_temp3_{}", joint_id).as_str());
     dFdv_cols[joint_id] = dFdv_cols_final.clone();
 
@@ -1317,7 +1370,172 @@ fn second_pass(
     //  = J_cols.transpose()*data.dFdv.middleCols(jmodel.idx_v(),data.nvSubtree[i]);
 
     let rnea_partial_dv_temp = j_cols_matrix.cross(&dFdv_temp).define(format!("rnea_partial_dv_temp_{}", joint_id).as_str());
-    rnea_partial_dv[joint_id] = rnea_partial_dv_temp;
+    //rnea_partial_dv[joint_id] = rnea_partial_dv_temp;
+
+    let mut rnea_partial_dv_temp_vec = vec![
+        rnea_partial_dv_temp.at_mat(0, 0),
+        rnea_partial_dv_temp.at_mat(0, 1),
+        rnea_partial_dv_temp.at_mat(0, 2),
+        rnea_partial_dv_temp.at_mat(0, 3),
+        rnea_partial_dv_temp.at_mat(0, 4),
+        rnea_partial_dv_temp.at_mat(0, 5)
+    ];
+
+    // // dtau/dq
+    // if(parent>0)
+    // {
+    //   dFdq_cols.noalias() = data.doYcrb[i] * dVdq_cols;
+    //   motionSet::inertiaAction<ADDTO>(data.oYcrb[i],dAdq_cols,dFdq_cols);
+    //   std::cout << "dFdq_cols temp 1: \n" << dFdq_cols << std::endl;  
+    // }
+    // else{
+    //   motionSet::inertiaAction(data.oYcrb[i],dAdq_cols,dFdq_cols);
+    //   std::cout << "dFdq_cols temp 2: \n" << dFdq_cols << std::endl;
+    // }
+    dFdq_cols[joint_id] = match joint_id {
+        // motionSet::inertiaAction(data.oYcrb[i],dAdq_cols,dFdq_cols);
+        0 => inertia_vec_mult(&masses[joint_id], &all_oycrb[joint_id].1, &all_oycrb[joint_id].0, &dAdq_cols[joint_id], joint_id),
+        ///   dFdq_cols.noalias() = data.doYcrb[i] * dVdq_cols;
+        ///   motionSet::inertiaAction<ADDTO>(data.oYcrb[i],dAdq_cols,dFdq_cols);
+        _ => {
+            let dFdq_temp = doycrb_i.cross(&dVdq_cols[joint_id]).define(format!("dFdq_temp_{}", joint_id).as_str());
+            let dFdq_temp2 = inertia_vec_mult(&masses[joint_id], &oycrb_i.1, &oycrb_i.0, &dAdq_cols[joint_id], joint_id);
+            (dFdq_temp + dFdq_temp2).define(format!("dFdq_temp3_{}", joint_id).as_str())
+        }
+    };
+
+    let dFdq_temp = Matrix!(
+        [dFdq_cols[0].at_vec(0), dFdq_cols[1].at_vec(0), dFdq_cols[2].at_vec(0), dFdq_cols[3].at_vec(0), dFdq_cols[4].at_vec(0), dFdq_cols[5].at_vec(0)],
+        [dFdq_cols[0].at_vec(1), dFdq_cols[1].at_vec(1), dFdq_cols[2].at_vec(1), dFdq_cols[3].at_vec(1), dFdq_cols[4].at_vec(1), dFdq_cols[5].at_vec(1)],
+        [dFdq_cols[0].at_vec(2), dFdq_cols[1].at_vec(2), dFdq_cols[2].at_vec(2), dFdq_cols[3].at_vec(2), dFdq_cols[4].at_vec(2), dFdq_cols[5].at_vec(2)],
+        [dFdq_cols[0].at_vec(3), dFdq_cols[1].at_vec(3), dFdq_cols[2].at_vec(3), dFdq_cols[3].at_vec(3), dFdq_cols[4].at_vec(3), dFdq_cols[5].at_vec(3)],
+        [dFdq_cols[0].at_vec(4), dFdq_cols[1].at_vec(4), dFdq_cols[2].at_vec(4), dFdq_cols[3].at_vec(4), dFdq_cols[4].at_vec(4), dFdq_cols[5].at_vec(4)],
+        [dFdq_cols[0].at_vec(5), dFdq_cols[1].at_vec(5), dFdq_cols[2].at_vec(5), dFdq_cols[3].at_vec(5), dFdq_cols[4].at_vec(5), dFdq_cols[5].at_vec(5)]
+    ).define(format!("dFdq_temp_{}", joint_id).as_str());
+
+    // rnea_partial_dq_.block(jmodel.idx_v(),jmodel.idx_v(),jmodel.nv(),data.nvSubtree[i]).noalias()
+    // = J_cols.transpose()*data.dFdq.middleCols(jmodel.idx_v(),data.nvSubtree[i]); // TODO:
+    let mut rnea_partial_dq_temp = j_cols_matrix.cross(&dFdq_temp).define(format!("rnea_partial_dq_temp_{}", joint_id).as_str());
+    let mut rnea_partial_dq_temp_vec = vec![
+        rnea_partial_dq_temp.at_mat(0, 0),
+        rnea_partial_dq_temp.at_mat(0, 1),
+        rnea_partial_dq_temp.at_mat(0, 2),
+        rnea_partial_dq_temp.at_mat(0, 3),
+        rnea_partial_dq_temp.at_mat(0, 4),
+        rnea_partial_dq_temp.at_mat(0, 5)
+    ];
+
+    // motionSet::act<ADDTO>(J_cols,data.of[i],dFdq_cols);
+    let J_cols_cross_of_i = cross_6d(&j_cols, &of_i).define(format!("J_cols_cross_of_i_{}", joint_id).as_str());
+    dFdq_cols[joint_id] = (&dFdq_cols[joint_id] + J_cols_cross_of_i).define(format!("dFdq_cols_final_{}", joint_id).as_str());
+
+    let dFdq_temp2 = Matrix!(
+        [dFdq_cols[0].at_vec(0), dFdq_cols[1].at_vec(0), dFdq_cols[2].at_vec(0), dFdq_cols[3].at_vec(0), dFdq_cols[4].at_vec(0), dFdq_cols[5].at_vec(0)],
+        [dFdq_cols[0].at_vec(1), dFdq_cols[1].at_vec(1), dFdq_cols[2].at_vec(1), dFdq_cols[3].at_vec(1), dFdq_cols[4].at_vec(1), dFdq_cols[5].at_vec(1)],
+        [dFdq_cols[0].at_vec(2), dFdq_cols[1].at_vec(2), dFdq_cols[2].at_vec(2), dFdq_cols[3].at_vec(2), dFdq_cols[4].at_vec(2), dFdq_cols[5].at_vec(2)],
+        [dFdq_cols[0].at_vec(3), dFdq_cols[1].at_vec(3), dFdq_cols[2].at_vec(3), dFdq_cols[3].at_vec(3), dFdq_cols[4].at_vec(3), dFdq_cols[5].at_vec(3)],
+        [dFdq_cols[0].at_vec(4), dFdq_cols[1].at_vec(4), dFdq_cols[2].at_vec(4), dFdq_cols[3].at_vec(4), dFdq_cols[4].at_vec(4), dFdq_cols[5].at_vec(4)],
+        [dFdq_cols[0].at_vec(5), dFdq_cols[1].at_vec(5), dFdq_cols[2].at_vec(5), dFdq_cols[3].at_vec(5), dFdq_cols[4].at_vec(5), dFdq_cols[5].at_vec(5)]
+    ).define(format!("dFdq_temp2_{}", joint_id).as_str());
+
+    // There should be a better way to implement this
+    // there is a if(parent > 0), but since this is backward pass,
+    // lhsInertiaMult(data.oYcrb[i],J_cols.transpose(),M6tmpR.topRows(jmodel.nv()));
+    let M6tmpR = inertia_vec_mult(&masses[joint_id], &oycrb_i.1, &oycrb_i.0, &j_cols, joint_id).define(format!("M6tmpR_{}", joint_id).as_str());
+    let M6tmpR2 = j_cols.cross(&doycrb_i).define(format!("M6tmpR2_{}", joint_id).as_str());
+
+    //for(int j = data.parents_fromRow[(typename Model::Index)jmodel.idx_v()];j >= 0; j = data.parents_fromRow[(typename Model::Index)j])
+    //{
+    //  rnea_partial_dq_.middleRows(jmodel.idx_v(),jmodel.nv()).col(j).noalias()
+    //  = M6tmpR.topRows(jmodel.nv()) * data.dAdq.col(j)
+    //  + M6tmpR2.topRows(jmodel.nv()) * data.dVdq.col(j); // TODO:seems kinda correct, but I'll need to check after I update dAdq, too
+    //  std::cout << "rnea_partial_dq_: " << rnea_partial_dq_ << std::endl;
+    //}
+    for j in (0..joint_id){
+        let dAdq_cols = dAdq_cols[j].clone();
+        let dVdq_cols = dVdq_cols[j].clone();
+        let rnea_partial_dq_temp2 = M6tmpR.dot(&dAdq_cols).define(format!("rnea_partial_dq_temp2_{}_{}", joint_id, j).as_str());
+        let rnea_partial_dq_temp3 = M6tmpR2.dot(&dVdq_cols).define(format!("rnea_partial_dq_temp3_{}_{}", joint_id, j).as_str());
+        let rnea_partial_dq_temp4 = (rnea_partial_dq_temp2 + rnea_partial_dq_temp3).define(format!("rnea_partial_dq_temp4_{}_{}", joint_id, j).as_str());
+
+        // now, apart from the element rnea_partial_dq_temp[j][joint_id], make everything zero, and that field should be rnea_partial_dq_temp4
+        // then add this to rnea_partial_dq_temp
+        //rnea_partial_dq_temp = rnea_partial_dq_temp.set_mat_at(j, joint_id, rnea_partial_dq_temp4.at_vec(0)).define(format!("rnea_partial_dq_temp5_{}_{}", joint_id, j).as_str());
+        rnea_partial_dq_temp_vec[j] = rnea_partial_dq_temp4;           
+    }
+    
+    rnea_partial_dq_rows[joint_id] = Vector!(
+        rnea_partial_dq_temp_vec[0].clone(),
+        rnea_partial_dq_temp_vec[1].clone(),
+        rnea_partial_dq_temp_vec[2].clone(),
+        rnea_partial_dq_temp_vec[3].clone(),
+        rnea_partial_dq_temp_vec[4].clone(),
+        rnea_partial_dq_temp_vec[5].clone()
+    ).define(format!("rnea_partial_dq_rows_{}", joint_id).as_str());
+
+
+    // now rnea_partial_dv
+    //rnea_partial_dv_.middleRows(jmodel.idx_v(),jmodel.nv()).col(j).noalias()
+    //= M6tmpR.topRows(jmodel.nv()) * data.dAdv.col(j)
+    //+ M6tmpR2.topRows(jmodel.nv()) * data.J.col(j); // TODO:
+    for j in (0..joint_id){
+        let dAdv_cols = dAdv_cols[j].clone();
+        let J_cols = j_cols_vec[j].clone();
+        let rnea_partial_dv_temp2 = M6tmpR.dot(&dAdv_cols).define(format!("rnea_partial_dv_temp2_{}_{}", joint_id, j).as_str());
+        let rnea_partial_dv_temp3 = M6tmpR2.dot(&J_cols).define(format!("rnea_partial_dv_temp3_{}_{}", joint_id, j).as_str());
+        let rnea_partial_dv_temp4 = (rnea_partial_dv_temp2 + rnea_partial_dv_temp3).define(format!("rnea_partial_dv_temp4_{}_{}", joint_id, j).as_str());
+
+        // now, apart from the element rnea_partial_dv_temp[j][joint_id], make everything zero, and that field should be rnea_partial_dv_temp4
+        // then add this to rnea_partial_dv_temp
+        //rnea_partial_dv_temp = rnea_partial_dv_temp.set_mat_at(j, joint_id, rnea_partial_dv_temp4.at_vec(0)).define(format!("rnea_partial_dv_temp5_{}_{}", joint_id, j).as_str());
+        rnea_partial_dv_temp_vec[j] = rnea_partial_dv_temp4;           
+    }
+
+    rnea_partial_dv_rows[joint_id] = Vector!(
+        rnea_partial_dv_temp_vec[0].clone(),
+        rnea_partial_dv_temp_vec[1].clone(),
+        rnea_partial_dv_temp_vec[2].clone(),
+        rnea_partial_dv_temp_vec[3].clone(),
+        rnea_partial_dv_temp_vec[4].clone(),
+        rnea_partial_dv_temp_vec[5].clone()
+    ).define(format!("rnea_partial_dv_rows_{}", joint_id).as_str());
+
+    
+
+
+    //for(Eigen::DenseIndex k =0; k < jmodel.nv(); ++k)
+    //  {
+    //    MotionRef<typename ColsBlock::ColXpr> m_in(J_cols.col(k));
+    //    MotionRef<typename ColsBlock::ColXpr> m_out(dAdq_cols.col(k));
+    //    m_out.linear() += model.gravity.linear().cross(m_in.angular());
+    //  }
+    // we need to update dAdq_cols
+    //dAdq_cols(k) += model.gravity.linear().cross(J_cols.col(k).angular());
+    // jmodel.nv() is 1 always for revolute joints
+    let gravity_linear = Vector!(0.0, 0.0, -9.81).define("gravity_linear");
+    let j_cols_angular = Vector!(
+        j_cols.at_vec(3), 
+        j_cols.at_vec(4), 
+        j_cols.at_vec(5)
+    ).define("j_cols_angular");
+    let cross_product = gravity_linear.cross(&j_cols_angular).define(format!("cross_product_{}", joint_id).as_str());
+    let dAdq_cols_joint_linear = Vector!(
+        dAdq_cols[joint_id].at_vec(0), 
+        dAdq_cols[joint_id].at_vec(1), 
+        dAdq_cols[joint_id].at_vec(2)
+    ).define("dAdq_cols_joint_linear");
+    let dAdq_cols_update = (dAdq_cols_joint_linear + cross_product).define(format!("dAdq_cols_temp_updated_{}", joint_id).as_str());
+    let dAdq_cols_updated = Vector!(
+        dAdq_cols_update.at_vec(0),
+        dAdq_cols_update.at_vec(1),
+        dAdq_cols_update.at_vec(2),
+        dAdq_cols[joint_id].at_vec(3),
+        dAdq_cols[joint_id].at_vec(4),
+        dAdq_cols[joint_id].at_vec(5)
+    ).define(format!("dAdq_cols_updated_{}", joint_id).as_str());
+
+    dAdq_cols[joint_id] = dAdq_cols_updated;
+
 
 
 
@@ -1468,72 +1686,10 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
         );
     }
 
-    // merge cols to matrices
-
-    //let J = Matrix!(
-    //    [j_cols[0].at_vec(0), j_cols[1].at_vec(0), j_cols[2].at_vec(0), j_cols[3].at_vec(0), j_cols[4].at_vec(0), j_cols[5].at_vec(0)],
-    //    [j_cols[0].at_vec(1), j_cols[1].at_vec(1), j_cols[2].at_vec(1), j_cols[3].at_vec(1), j_cols[4].at_vec(1), j_cols[5].at_vec(1)],
-    //    [j_cols[0].at_vec(2), j_cols[1].at_vec(2), j_cols[2].at_vec(2), j_cols[3].at_vec(2), j_cols[4].at_vec(2), j_cols[5].at_vec(2)],
-    //    [j_cols[0].at_vec(3), j_cols[1].at_vec(3), j_cols[2].at_vec(3), j_cols[3].at_vec(3), j_cols[4].at_vec(3), j_cols[5].at_vec(3)],
-    //    [j_cols[0].at_vec(4), j_cols[1].at_vec(4), j_cols[2].at_vec(4), j_cols[3].at_vec(4), j_cols[4].at_vec(4), j_cols[5].at_vec(4)],
-    //    [j_cols[0].at_vec(5), j_cols[1].at_vec(5), j_cols[2].at_vec(5), j_cols[3].at_vec(5), j_cols[4].at_vec(5), j_cols[5].at_vec(5)]
-    //).define("J");
-    //
-    //let dJ = Matrix!(
-    //    [dj_cols[0].at_vec(0), dj_cols[1].at_vec(0), dj_cols[2].at_vec(0), dj_cols[3].at_vec(0), dj_cols[4].at_vec(0), dj_cols[5].at_vec(0)],
-    //    [dj_cols[0].at_vec(1), dj_cols[1].at_vec(1), dj_cols[2].at_vec(1), dj_cols[3].at_vec(1), dj_cols[4].at_vec(1), dj_cols[5].at_vec(1)],
-    //    [dj_cols[0].at_vec(2), dj_cols[1].at_vec(2), dj_cols[2].at_vec(2), dj_cols[3].at_vec(2), dj_cols[4].at_vec(2), dj_cols[5].at_vec(2)],
-    //    [dj_cols[0].at_vec(3), dj_cols[1].at_vec(3), dj_cols[2].at_vec(3), dj_cols[3].at_vec(3), dj_cols[4].at_vec(3), dj_cols[5].at_vec(3)],
-    //    [dj_cols[0].at_vec(4), dj_cols[1].at_vec(4), dj_cols[2].at_vec(4), dj_cols[3].at_vec(4), dj_cols[4].at_vec(4), dj_cols[5].at_vec(4)],
-    //    [dj_cols[0].at_vec(5), dj_cols[1].at_vec(5), dj_cols[2].at_vec(5), dj_cols[3].at_vec(5), dj_cols[4].at_vec(5), dj_cols[5].at_vec(5)]
-    //).define("dJ");
-    //
-    //let dVdq = Matrix!(
-    //    [dVdq_cols[0].at_vec(0), dVdq_cols[1].at_vec(0), dVdq_cols[2].at_vec(0), dVdq_cols[3].at_vec(0), dVdq_cols[4].at_vec(0), dVdq_cols[5].at_vec(0)],
-    //    [dVdq_cols[0].at_vec(1), dVdq_cols[1].at_vec(1), dVdq_cols[2].at_vec(1), dVdq_cols[3].at_vec(1), dVdq_cols[4].at_vec(1), dVdq_cols[5].at_vec(1)],
-    //    [dVdq_cols[0].at_vec(2), dVdq_cols[1].at_vec(2), dVdq_cols[2].at_vec(2), dVdq_cols[3].at_vec(2), dVdq_cols[4].at_vec(2), dVdq_cols[5].at_vec(2)],
-    //    [dVdq_cols[0].at_vec(3), dVdq_cols[1].at_vec(3), dVdq_cols[2].at_vec(3), dVdq_cols[3].at_vec(3), dVdq_cols[4].at_vec(3), dVdq_cols[5].at_vec(3)],
-    //    [dVdq_cols[0].at_vec(4), dVdq_cols[1].at_vec(4), dVdq_cols[2].at_vec(4), dVdq_cols[3].at_vec(4), dVdq_cols[4].at_vec(4), dVdq_cols[5].at_vec(4)],
-    //    [dVdq_cols[0].at_vec(5), dVdq_cols[1].at_vec(5), dVdq_cols[2].at_vec(5), dVdq_cols[3].at_vec(5), dVdq_cols[4].at_vec(5), dVdq_cols[5].at_vec(5)]
-    //).define("dVdq");
-    //
-    //let dAdq = Matrix!(
-    //    [dAdq_cols[0].at_vec(0), dAdq_cols[1].at_vec(0), dAdq_cols[2].at_vec(0), dAdq_cols[3].at_vec(0), dAdq_cols[4].at_vec(0), dAdq_cols[5].at_vec(0)],
-    //    [dAdq_cols[0].at_vec(1), dAdq_cols[1].at_vec(1), dAdq_cols[2].at_vec(1), dAdq_cols[3].at_vec(1), dAdq_cols[4].at_vec(1), dAdq_cols[5].at_vec(1)],
-    //    [dAdq_cols[0].at_vec(2), dAdq_cols[1].at_vec(2), dAdq_cols[2].at_vec(2), dAdq_cols[3].at_vec(2), dAdq_cols[4].at_vec(2), dAdq_cols[5].at_vec(2)],
-    //    [dAdq_cols[0].at_vec(3), dAdq_cols[1].at_vec(3), dAdq_cols[2].at_vec(3), dAdq_cols[3].at_vec(3), dAdq_cols[4].at_vec(3), dAdq_cols[5].at_vec(3)],
-    //    [dAdq_cols[0].at_vec(4), dAdq_cols[1].at_vec(4), dAdq_cols[2].at_vec(4), dAdq_cols[3].at_vec(4), dAdq_cols[4].at_vec(4), dAdq_cols[5].at_vec(4)],
-    //    [dAdq_cols[0].at_vec(5), dAdq_cols[1].at_vec(5), dAdq_cols[2].at_vec(5), dAdq_cols[3].at_vec(5), dAdq_cols[4].at_vec(5), dAdq_cols[5].at_vec(5)]
-    //).define("dAdq");
-    //
-    //let dAdv = Matrix!(
-    //    [dAdv_cols[0].at_vec(0), dAdv_cols[1].at_vec(0), dAdv_cols[2].at_vec(0), dAdv_cols[3].at_vec(0), dAdv_cols[4].at_vec(0), dAdv_cols[5].at_vec(0)],
-    //    [dAdv_cols[0].at_vec(1), dAdv_cols[1].at_vec(1), dAdv_cols[2].at_vec(1), dAdv_cols[3].at_vec(1), dAdv_cols[4].at_vec(1), dAdv_cols[5].at_vec(1)],
-    //    [dAdv_cols[0].at_vec(2), dAdv_cols[1].at_vec(2), dAdv_cols[2].at_vec(2), dAdv_cols[3].at_vec(2), dAdv_cols[4].at_vec(2), dAdv_cols[5].at_vec(2)],
-    //    [dAdv_cols[0].at_vec(3), dAdv_cols[1].at_vec(3), dAdv_cols[2].at_vec(3), dAdv_cols[3].at_vec(3), dAdv_cols[4].at_vec(3), dAdv_cols[5].at_vec(3)],
-    //    [dAdv_cols[0].at_vec(4), dAdv_cols[1].at_vec(4), dAdv_cols[2].at_vec(4), dAdv_cols[3].at_vec(4), dAdv_cols[4].at_vec(4), dAdv_cols[5].at_vec(4)],
-    //    [dAdv_cols[0].at_vec(5), dAdv_cols[1].at_vec(5), dAdv_cols[2].at_vec(5), dAdv_cols[3].at_vec(5), dAdv_cols[4].at_vec(5), dAdv_cols[5].at_vec(5)]
-    //).define("dAdv");
-
-    //dFdq_cols: ASTNode,
-    //dFdv_cols: ASTNode,
-    //dFda_cols: ASTNode,
-    //rnea_partial_dq: &mut ASTNode,
-    //rnea_partial_dv: &mut ASTNode,
-    //rnea_partial_da: &mut ASTNode,
-
     let mut taus: Vec<ASTNode> = vec![];
     let mut dFdq_cols: Vec<ASTNode> = vec![];
     let mut dFdv_cols: Vec<ASTNode> = vec![];
     let mut dFda_cols: Vec<ASTNode> = vec![];
-    let mut rnea_partial_dq: ASTNode = Matrix!( // need a better way to initialize these!
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    ).define("rnea_partial_dq_initial");
     let mut rnea_partial_dv: ASTNode = Matrix!( // need a better way to initialize these!
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -1559,6 +1715,14 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdv_cols_init_4"),
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdv_cols_init_5")
     ];
+    let mut dFdq_cols: Vec<ASTNode> = vec![
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdq_cols_init_0"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdq_cols_init_1"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdq_cols_init_2"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdq_cols_init_3"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdq_cols_init_4"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("dFdq_cols_init_5")
+    ];
     let mut rnea_partial_da_cols: Vec<ASTNode> = vec![
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_da_cols_init_0"),
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_da_cols_init_1"),
@@ -1575,17 +1739,25 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dv_cols_init_4"),
         Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dv_cols_init_5")
     ];
+    let mut rnea_partial_dq_cols: Vec<ASTNode> = vec![
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dq_cols_init_0"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dq_cols_init_1"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dq_cols_init_2"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dq_cols_init_3"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dq_cols_init_4"),
+        Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define("rnea_partial_dq_cols_init_5")
+    ];
 
     for i in (0..n_joints).rev(){
         second_pass(
-            j_cols[i].clone(),
-            dVdq_cols[i].clone(),
-            dAdq_cols[i].clone(),
-            dAdv_cols[i].clone(),
+            &j_cols,
+            &dVdq_cols,
+            &mut dAdq_cols,
+            &mut dAdv_cols,
             &mut dFdq_cols,
             &mut dFdv_cols,
             &mut dFda_cols,
-            &mut rnea_partial_dq,
+            &mut rnea_partial_dq_cols,
             &mut rnea_partial_dv_cols,
             &mut rnea_partial_da_cols,
             &mut all_of,
@@ -1625,14 +1797,43 @@ pub fn rneaderivatives(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) {
         [dFdv_cols[0].at_vec(5), dFdv_cols[1].at_vec(5), dFdv_cols[2].at_vec(5), dFdv_cols[3].at_vec(5), dFdv_cols[4].at_vec(5), dFdv_cols[5].at_vec(5)]
     ).define("dFdv_final");
 
+    let dFdq_final: ASTNode = Matrix!(
+        [dFdq_cols[0].at_vec(0), dFdq_cols[1].at_vec(0), dFdq_cols[2].at_vec(0), dFdq_cols[3].at_vec(0), dFdq_cols[4].at_vec(0), dFdq_cols[5].at_vec(0)],
+        [dFdq_cols[0].at_vec(1), dFdq_cols[1].at_vec(1), dFdq_cols[2].at_vec(1), dFdq_cols[3].at_vec(1), dFdq_cols[4].at_vec(1), dFdq_cols[5].at_vec(1)],
+        [dFdq_cols[0].at_vec(2), dFdq_cols[1].at_vec(2), dFdq_cols[2].at_vec(2), dFdq_cols[3].at_vec(2), dFdq_cols[4].at_vec(2), dFdq_cols[5].at_vec(2)],
+        [dFdq_cols[0].at_vec(3), dFdq_cols[1].at_vec(3), dFdq_cols[2].at_vec(3), dFdq_cols[3].at_vec(3), dFdq_cols[4].at_vec(3), dFdq_cols[5].at_vec(3)],
+        [dFdq_cols[0].at_vec(4), dFdq_cols[1].at_vec(4), dFdq_cols[2].at_vec(4), dFdq_cols[3].at_vec(4), dFdq_cols[4].at_vec(4), dFdq_cols[5].at_vec(4)],
+        [dFdq_cols[0].at_vec(5), dFdq_cols[1].at_vec(5), dFdq_cols[2].at_vec(5), dFdq_cols[3].at_vec(5), dFdq_cols[4].at_vec(5), dFdq_cols[5].at_vec(5)]
+    ).define("dFdq_final");
+
     let rnea_partial_dv: ASTNode = Matrix!(
-        [rnea_partial_dv_cols[0].at_mat(0, 0), rnea_partial_dv_cols[0].at_mat(0, 1), rnea_partial_dv_cols[0].at_mat(0, 2), rnea_partial_dv_cols[0].at_mat(0, 3), rnea_partial_dv_cols[0].at_mat(0, 4), rnea_partial_dv_cols[0].at_mat(0, 5)],
-        [rnea_partial_dv_cols[1].at_mat(0, 0), rnea_partial_dv_cols[1].at_mat(0, 1), rnea_partial_dv_cols[1].at_mat(0, 2), rnea_partial_dv_cols[1].at_mat(0, 3), rnea_partial_dv_cols[1].at_mat(0, 4), rnea_partial_dv_cols[1].at_mat(0, 5)],
-        [rnea_partial_dv_cols[2].at_mat(0, 0), rnea_partial_dv_cols[2].at_mat(0, 1), rnea_partial_dv_cols[2].at_mat(0, 2), rnea_partial_dv_cols[2].at_mat(0, 3), rnea_partial_dv_cols[2].at_mat(0, 4), rnea_partial_dv_cols[2].at_mat(0, 5)],
-        [rnea_partial_dv_cols[3].at_mat(0, 0), rnea_partial_dv_cols[3].at_mat(0, 1), rnea_partial_dv_cols[3].at_mat(0, 2), rnea_partial_dv_cols[3].at_mat(0, 3), rnea_partial_dv_cols[3].at_mat(0, 4), rnea_partial_dv_cols[3].at_mat(0, 5)],
-        [rnea_partial_dv_cols[4].at_mat(0, 0), rnea_partial_dv_cols[4].at_mat(0, 1), rnea_partial_dv_cols[4].at_mat(0, 2), rnea_partial_dv_cols[4].at_mat(0, 3), rnea_partial_dv_cols[4].at_mat(0, 4), rnea_partial_dv_cols[4].at_mat(0, 5)],
-        [rnea_partial_dv_cols[5].at_mat(0, 0), rnea_partial_dv_cols[5].at_mat(0, 1), rnea_partial_dv_cols[5].at_mat(0, 2), rnea_partial_dv_cols[5].at_mat(0, 3), rnea_partial_dv_cols[5].at_mat(0, 4), rnea_partial_dv_cols[5].at_mat(0, 5)]
+        [rnea_partial_dv_cols[0].at_vec(0), rnea_partial_dv_cols[1].at_vec(0), rnea_partial_dv_cols[2].at_vec(0), rnea_partial_dv_cols[3].at_vec(0), rnea_partial_dv_cols[4].at_vec(0), rnea_partial_dv_cols[5].at_vec(0)],
+        [rnea_partial_dv_cols[0].at_vec(1), rnea_partial_dv_cols[1].at_vec(1), rnea_partial_dv_cols[2].at_vec(1), rnea_partial_dv_cols[3].at_vec(1), rnea_partial_dv_cols[4].at_vec(1), rnea_partial_dv_cols[5].at_vec(1)],
+        [rnea_partial_dv_cols[0].at_vec(2), rnea_partial_dv_cols[1].at_vec(2), rnea_partial_dv_cols[2].at_vec(2), rnea_partial_dv_cols[3].at_vec(2), rnea_partial_dv_cols[4].at_vec(2), rnea_partial_dv_cols[5].at_vec(2)],
+        [rnea_partial_dv_cols[0].at_vec(3), rnea_partial_dv_cols[1].at_vec(3), rnea_partial_dv_cols[2].at_vec(3), rnea_partial_dv_cols[3].at_vec(3), rnea_partial_dv_cols[4].at_vec(3), rnea_partial_dv_cols[5].at_vec(3)],
+        [rnea_partial_dv_cols[0].at_vec(4), rnea_partial_dv_cols[1].at_vec(4), rnea_partial_dv_cols[2].at_vec(4), rnea_partial_dv_cols[3].at_vec(4), rnea_partial_dv_cols[4].at_vec(4), rnea_partial_dv_cols[5].at_vec(4)],
+        [rnea_partial_dv_cols[0].at_vec(5), rnea_partial_dv_cols[1].at_vec(5), rnea_partial_dv_cols[2].at_vec(5), rnea_partial_dv_cols[3].at_vec(5), rnea_partial_dv_cols[4].at_vec(5), rnea_partial_dv_cols[5].at_vec(5)]
     ).define("rnea_partial_dv_final");
+
+    let rnea_partial_dq: ASTNode = Matrix!(
+        [rnea_partial_dq_cols[0].at_vec(0), rnea_partial_dq_cols[1].at_vec(0), rnea_partial_dq_cols[2].at_vec(0), rnea_partial_dq_cols[3].at_vec(0), rnea_partial_dq_cols[4].at_vec(0), rnea_partial_dq_cols[5].at_vec(0)],
+        [rnea_partial_dq_cols[0].at_vec(1), rnea_partial_dq_cols[1].at_vec(1), rnea_partial_dq_cols[2].at_vec(1), rnea_partial_dq_cols[3].at_vec(1), rnea_partial_dq_cols[4].at_vec(1), rnea_partial_dq_cols[5].at_vec(1)],
+        [rnea_partial_dq_cols[0].at_vec(2), rnea_partial_dq_cols[1].at_vec(2), rnea_partial_dq_cols[2].at_vec(2), rnea_partial_dq_cols[3].at_vec(2), rnea_partial_dq_cols[4].at_vec(2), rnea_partial_dq_cols[5].at_vec(2)],
+        [rnea_partial_dq_cols[0].at_vec(3), rnea_partial_dq_cols[1].at_vec(3), rnea_partial_dq_cols[2].at_vec(3), rnea_partial_dq_cols[3].at_vec(3), rnea_partial_dq_cols[4].at_vec(3), rnea_partial_dq_cols[5].at_vec(3)],
+        [rnea_partial_dq_cols[0].at_vec(4), rnea_partial_dq_cols[1].at_vec(4), rnea_partial_dq_cols[2].at_vec(4), rnea_partial_dq_cols[3].at_vec(4), rnea_partial_dq_cols[4].at_vec(4), rnea_partial_dq_cols[5].at_vec(4)],
+        [rnea_partial_dq_cols[0].at_vec(5), rnea_partial_dq_cols[1].at_vec(5), rnea_partial_dq_cols[2].at_vec(5), rnea_partial_dq_cols[3].at_vec(5), rnea_partial_dq_cols[4].at_vec(5), rnea_partial_dq_cols[5].at_vec(5)]
+    ).define("rnea_partial_dq_final");
+
+    let dAdq_final: ASTNode = Matrix!(
+        [dAdq_cols[0].at_vec(0), dAdq_cols[1].at_vec(0), dAdq_cols[2].at_vec(0), dAdq_cols[3].at_vec(0), dAdq_cols[4].at_vec(0), dAdq_cols[5].at_vec(0)],
+        [dAdq_cols[0].at_vec(1), dAdq_cols[1].at_vec(1), dAdq_cols[2].at_vec(1), dAdq_cols[3].at_vec(1), dAdq_cols[4].at_vec(1), dAdq_cols[5].at_vec(1)],
+        [dAdq_cols[0].at_vec(2), dAdq_cols[1].at_vec(2), dAdq_cols[2].at_vec(2), dAdq_cols[3].at_vec(2), dAdq_cols[4].at_vec(2), dAdq_cols[5].at_vec(2)],
+        [dAdq_cols[0].at_vec(3), dAdq_cols[1].at_vec(3), dAdq_cols[2].at_vec(3), dAdq_cols[3].at_vec(3), dAdq_cols[4].at_vec(3), dAdq_cols[5].at_vec(3)],
+        [dAdq_cols[0].at_vec(4), dAdq_cols[1].at_vec(4), dAdq_cols[2].at_vec(4), dAdq_cols[3].at_vec(4), dAdq_cols[4].at_vec(4), dAdq_cols[5].at_vec(4)],
+        [dAdq_cols[0].at_vec(5), dAdq_cols[1].at_vec(5), dAdq_cols[2].at_vec(5), dAdq_cols[3].at_vec(5), dAdq_cols[4].at_vec(5), dAdq_cols[5].at_vec(5)]
+    ).define("dAdq_final");
+
+
     
 
 }
