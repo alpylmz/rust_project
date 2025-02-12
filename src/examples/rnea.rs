@@ -17,12 +17,12 @@ fn validate_vector(node: &ASTNode, name: &str) {
 // I strongly disagree with this function's name, but it is actInv in pinocchio,
 // so I will leave it as is for now
 fn act_inv(translation: &ASTNode, rotation: &ASTNode, linear: &ASTNode, angular: &ASTNode, linear_parent: ASTNode, angular_parent: ASTNode, joint_id: usize) -> (ASTNode, ASTNode) {
-    let act_inv1 = translation.clone().cross(angular_parent.clone()).define(format!("actInv1_{}", joint_id).as_str());
+    let act_inv1 = translation.clone().cross(&angular_parent).define(format!("actInv1_{}", joint_id).as_str());
     let act_inv2 = (linear_parent.clone() - act_inv1).define(format!("actInv2_{}", joint_id).as_str());
     let act_inv3 = rotation.clone().transpose().define(format!("actInv3_{}", joint_id).as_str());
-    let act_inv4 = (act_inv3.clone().cross(act_inv2)).define(format!("actInv4_{}", joint_id).as_str());
+    let act_inv4 = (act_inv3.clone().cross(&act_inv2)).define(format!("actInv4_{}", joint_id).as_str());
     let new_linear = (linear.clone() + act_inv4).define(format!("act_inv_linear_{}", joint_id).as_str());
-    let act_inv5 = (act_inv3.clone().cross(angular_parent.clone())).define(format!("actInv5_{}", joint_id).as_str());
+    let act_inv5 = (act_inv3.clone().cross(&angular_parent)).define(format!("actInv5_{}", joint_id).as_str());
     let new_angular = (angular.clone() + act_inv5).define(format!("act_inv_angular_{}", joint_id).as_str());
 
     (new_linear, new_angular)
@@ -137,10 +137,10 @@ fn act(
         f.clone().at_vec(5)
     ).define(format!("f_angular_{}", joint_id).as_str());
 
-    let new_f_linear = (rotation.clone().cross(f_linear.clone())).define(format!("new_f_linear_{}", joint_id).as_str());
-    let new_f_angular = (rotation.clone().cross(f_angular.clone())).define(format!("new_f_angular_temp_{}", joint_id).as_str());
+    let new_f_linear = (rotation.clone().cross(&f_linear)).define(format!("new_f_linear_{}", joint_id).as_str());
+    let new_f_angular = (rotation.clone().cross(&f_angular)).define(format!("new_f_angular_temp_{}", joint_id).as_str());
 
-    let f_angular_cross = translation.clone().cross(new_f_linear.clone()).define(format!("f_angular_cross_{}", joint_id).as_str());
+    let f_angular_cross = translation.clone().cross(&new_f_linear).define(format!("f_angular_cross_{}", joint_id).as_str());
 
     let new_f_angular = (new_f_angular.clone() + f_angular_cross.clone()).define(format!("new_f_angular_{}", joint_id).as_str());
 
@@ -286,7 +286,7 @@ fn first_pass(
     //let data_h = Vector!(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).define(format!("data_h_{}", joint_id).as_str());
     // data.v[i] is new_v at this point
     // firstly mass * (v.linear - lever.cross(v.angular))
-    let h_linear_1 = levers[joint_id].clone().cross(new_v_angular.clone()).define(format!("h_linear_1_{}", joint_id).as_str());
+    let h_linear_1 = levers[joint_id].clone().cross(&new_v_angular).define(format!("h_linear_1_{}", joint_id).as_str());
     let h_linear_2 = (new_v_linear.clone() - h_linear_1).define(format!("h_linear_2_{}", joint_id).as_str());
     let h_linear = (masses.clone().at_vec(joint_id) * h_linear_2).define(format!("h_linear_{}", joint_id).as_str());
 
@@ -294,14 +294,14 @@ fn first_pass(
     let h_angular = rhs_mult(inertias[joint_id].clone(), new_v_angular.clone(), joint_id).define(format!("h_angular_first_{}", joint_id).as_str());
 
     // next line is f.angular() += lever().cross(f.linear());
-    let h_angular_1 = levers[joint_id].clone().cross(h_linear.clone()).define(format!("h_angular_1_{}", joint_id).as_str());
+    let h_angular_1 = levers[joint_id].clone().cross(&h_linear).define(format!("h_angular_1_{}", joint_id).as_str());
     let h_angular_2 = (h_angular.clone() + h_angular_1).define(format!("h_angular_{}", joint_id).as_str());
 
 
 
     // next line is model.inertias[i].__mult__(data.a_gf[i],data.f[i]);
     // firstly mass * (a_gf.linear - lever.cross(a_gf.angular))
-    let f_linear_1 = levers[joint_id].clone().cross(new_a_gf_up2_angular.clone()).define(format!("f_linear_1_{}", joint_id).as_str());
+    let f_linear_1 = levers[joint_id].clone().cross(&new_a_gf_up2_angular).define(format!("f_linear_1_{}", joint_id).as_str());
     let f_linear_2 = (new_a_gf_up2_linear.clone() - f_linear_1).define(format!("f_linear_2_{}", joint_id).as_str());
     let f_linear_3 = (masses.clone().at_vec(joint_id) * f_linear_2).define(format!("f_linear_3_{}", joint_id).as_str());
 
@@ -310,7 +310,7 @@ fn first_pass(
     let f_angular = rhs_mult(inertias[joint_id].clone(), new_a_gf_up2_angular.clone(), joint_id).define(format!("f_angular_first_{}", joint_id).as_str());
 
     // next line is f.angular() += lever().cross(f.linear());
-    let f_angular_1 = levers[joint_id].clone().cross(f_linear_3.clone()).define(format!("f_angular_1_{}", joint_id).as_str());
+    let f_angular_1 = levers[joint_id].clone().cross(&f_linear_3).define(format!("f_angular_1_{}", joint_id).as_str());
     let f_angular_2 = (f_angular.clone() + f_angular_1).define(format!("f_angular_2_{}", joint_id).as_str());
     //////////////////////////
 
@@ -326,12 +326,12 @@ fn first_pass(
       fout.angular().noalias() = v.angular().cross(angular())+v.linear().cross(linear());
     }
     */
-    let f_linear_4_temp = (new_v_angular.clone().cross(h_linear.clone())).define(format!("f_linear_4_temp_{}", joint_id).as_str());
+    let f_linear_4_temp = (new_v_angular.clone().cross(&h_linear)).define(format!("f_linear_4_temp_{}", joint_id).as_str());
     let f_linear_4 = (f_linear_3.clone() + f_linear_4_temp).define(format!("f_linear_4_{}", joint_id).as_str());
 
-    let f_angular_3_temp = (new_v_angular.clone().cross(h_angular.clone())).define(format!("f_angular_3_temp_{}", joint_id).as_str());
+    let f_angular_3_temp = (new_v_angular.clone().cross(&h_angular)).define(format!("f_angular_3_temp_{}", joint_id).as_str());
     let f_angular_3 = (f_angular_2.clone() + f_angular_3_temp).define(format!("f_angular_3_{}", joint_id).as_str());
-    let f_angular_4_temp = (new_v_linear.clone().cross(h_linear.clone())).define(format!("f_angular_4_temp_{}", joint_id).as_str());
+    let f_angular_4_temp = (new_v_linear.clone().cross(&h_linear)).define(format!("f_angular_4_temp_{}", joint_id).as_str());
     let f_angular_4 = (f_angular_3.clone() + f_angular_4_temp).define(format!("f_angular_4_{}", joint_id).as_str());
 
     let h = Vector!(
@@ -441,7 +441,7 @@ pub fn rnea(qsin: ASTNode, qcos: ASTNode, v: ASTNode, a: ASTNode) -> ASTNode {
     validate_vector(&v, "v");
     validate_vector(&a, "a");
 
-    let n_joints = 6;
+    let n_joints = 3;
 
     // I will hardcode some part of the logic here, the parts about panda's model placement
     // I need to change it to actual jointPlacements and other structure in the future, by making them inputs
